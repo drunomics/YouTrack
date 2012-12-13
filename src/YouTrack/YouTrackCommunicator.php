@@ -37,14 +37,14 @@ class YouTrackCommunicator
         return $headers;
     }
 
-    private function login()
+    public function login()
     {
-        $response = $this->browser->post($this->options['url'].'/rest/user/login', array(
+        $response = $this->browser->post($this->options['uri'].'/rest/user/login', array(
             'Content-Type' => 'application/x-www-form-urlencoded'
             ), array('login' => $this->options['username'], 'password' => $this->options['password']));
 
         if (!$response->isOk()) {
-            throw new \RuntimeException("Couldn't login!");
+            throw new Exception\APIException(__METHOD__, $response);
         }
 
         $this->cookie = $response->getHeader('Set-Cookie', false);
@@ -87,7 +87,7 @@ class YouTrackCommunicator
             throw new \InvalidArgumentException('Supply the issue ID without the #');
         }
 
-        $response = $this->browser->get($this->options['url'].'/rest/issue/'.$id, $this->buildHeaders());
+        $response = $this->browser->get($this->options['uri'].'/rest/issue/'.$id, $this->buildHeaders());
         if ($response->isNotFound()) {
             return null;
         }
@@ -109,7 +109,7 @@ class YouTrackCommunicator
         $search = implode("%20", array_map(function($id) {
             return "%23$id";
         }, $ids));
-        $response = $this->browser->get($this->options['url'].'/rest/issue?filter='.$search, $this->buildHeaders());
+        $response = $this->browser->get($this->options['uri'].'/rest/issue?filter='.$search, $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -137,7 +137,7 @@ class YouTrackCommunicator
             $post[] = 'runAs='.$runAs;
         }
 
-        $response = $this->browser->post($this->options['url'].'/rest/issue/'.$issue->getId().'/execute', $this->buildHeaders(), implode("&", $post));
+        $response = $this->browser->post($this->options['uri'].'/rest/issue/'.$issue->getId().'/execute', $this->buildHeaders(), implode("&", $post));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -146,14 +146,14 @@ class YouTrackCommunicator
 
     public function findUserName($email)
     {
-        $response = $this->browser->get($this->options['url'].'/rest/admin/user?q='.$email, $this->buildHeaders());
+        $response = $this->browser->get($this->options['uri'].'/rest/admin/user?q='.$email, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
 
         $data = json_decode($response->getContent(), true);
         foreach ($data as $userData) {
-            $response = $this->browser->get($userData['url'], $this->buildHeaders());
+            $response = $this->browser->get($userData['uri'], $this->buildHeaders());
             if (!$response->isOk()) {
                 throw new Exception\APIException(__METHOD__, $response);
             }

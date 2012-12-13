@@ -1,0 +1,26 @@
+{
+    "name": "samson/youtrack",
+    "type": "library",
+    "description": "Service to communicate with the YouTrack API",
+    "keywords": ["youtrack","api"],
+    "homepage": "http://github.com/SamsonIT/YouTrack",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "authors": [
+        {
+            "name": "Bart van den Burg",
+            "email": "bart@samson-it.nl",
+            "homepage": "http://www.samson-it.nl",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0",
+        "kriswallsmith/buzz": "0.7.*"
+    },
+    "autoload": {
+        "psr-0": {
+            "YouTrack": "src"
+        }
+    }
+}

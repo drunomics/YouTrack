@@ -180,4 +180,37 @@ class YouTrackCommunicator
 
         return null;
     }
+
+    public function releaseVersion($project, $version)
+    {
+        $response = $this->browser->get($this->options['uri'].'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+        $fieldData = json_decode($response->getContent(), true);
+        $bundleName = $fieldData['param'][0]['value'];
+
+        $response = $this->browser->get($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+
+        $versionsData = json_decode($response->getContent(), true);
+        $foundVersions = array();
+        foreach($versionsData['version'] as $versionData) {
+            $foundVersions[] = $versionData['value'];
+            if ($versionData['value'] == $version) {
+                $response = $this->browser->post($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
+                    'releaseDate' => time().'000',
+                    'released' => "true"
+                )));
+                if (!$response->isOk()) {
+                    throw new Exception\APIException(__METHOD__, $response);
+                }
+                return true;
+            }
+        }
+
+        throw new \InvalidArgumentException('The tagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
+    }
 }

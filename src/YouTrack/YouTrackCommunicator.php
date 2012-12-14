@@ -153,7 +153,7 @@ class YouTrackCommunicator
 
         $data = json_decode($response->getContent(), true);
         foreach ($data as $userData) {
-            $response = $this->browser->get($userData['uri'], $this->buildHeaders());
+            $response = $this->browser->get($userData['url'], $this->buildHeaders());
             if (!$response->isOk()) {
                 throw new Exception\APIException(__METHOD__, $response);
             }

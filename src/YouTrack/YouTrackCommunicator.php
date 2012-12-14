@@ -24,7 +24,20 @@ class YouTrackCommunicator
         $this->options = $options;
     }
 
-    private function buildHeaders(array $headers = array())
+    protected function getOption($option)
+    {
+        if (!isset($this->options[$option])) {
+            throw new \InvalidArgumentException('The option '.$option.' does not exist');
+        }
+        return $this->options[$option];
+    }
+
+    protected function getBrowser()
+    {
+        return $this->browser;
+    }
+
+    protected function buildHeaders(array $headers = array())
     {
         if (null === $this->cookie) {
             $this->login();

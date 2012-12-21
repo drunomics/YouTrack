@@ -52,9 +52,9 @@ class YouTrackCommunicator
 
     public function login()
     {
-        $response = $this->browser->post($this->options['uri'].'/rest/user/login', array(
+        $response = $this->browser->post($this->getOption('uri').'/rest/user/login', array(
             'Content-Type' => 'application/x-www-form-urlencoded'
-            ), array('login' => $this->options['username'], 'password' => $this->options['password']));
+            ), array('login' => $this->getOption('username'), 'password' => $this->getOption('password')));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -100,7 +100,7 @@ class YouTrackCommunicator
             throw new \InvalidArgumentException('Supply the issue ID without the #');
         }
 
-        $response = $this->browser->get($this->options['uri'].'/rest/issue/'.$id, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri').'/rest/issue/'.$id, $this->buildHeaders());
         if ($response->isNotFound()) {
             return null;
         }
@@ -122,7 +122,7 @@ class YouTrackCommunicator
         $search = implode("%20", array_map(function($id) {
             return "%23$id";
         }, $ids));
-        $response = $this->browser->get($this->options['uri'].'/rest/issue?filter='.$search, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri').'/rest/issue?filter='.$search, $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -150,7 +150,7 @@ class YouTrackCommunicator
             $post[] = 'runAs='.$runAs;
         }
 
-        $response = $this->browser->post($this->options['uri'].'/rest/issue/'.$issue->getId().'/execute', $this->buildHeaders(), implode("&", $post));
+        $response = $this->browser->post($this->getOption('uri').'/rest/issue/'.$issue->getId().'/execute', $this->buildHeaders(), implode("&", $post));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -159,7 +159,7 @@ class YouTrackCommunicator
 
     public function findUserName($email)
     {
-        $response = $this->browser->get($this->options['uri'].'/rest/admin/user?q='.$email, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri').'/rest/admin/user?q='.$email, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -183,14 +183,14 @@ class YouTrackCommunicator
 
     public function releaseVersion($project, $version)
     {
-        $response = $this->browser->get($this->options['uri'].'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri').'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
         $fieldData = json_decode($response->getContent(), true);
         $bundleName = $fieldData['param'][0]['value'];
 
-        $response = $this->browser->get($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri').'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -200,7 +200,7 @@ class YouTrackCommunicator
         foreach($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
-                $response = $this->browser->post($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
+                $response = $this->browser->post($this->getOption('uri').'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
                     'releaseDate' => time().'000',
                     'released' => "true"
                 )));

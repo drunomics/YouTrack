@@ -18,6 +18,8 @@ class Issue {
     private $summary;
 
     private $description;
+    
+    private $parent;
 
     public function getId()
     {
@@ -78,4 +80,15 @@ class Issue {
     {
         $this->description = $description;
     }
+
+    public function getParent()
+    {
+        return $this->parent;
+    }
+
+    public function setParent(Issue $parent)
+    {
+        $this->parent = $parent;
+    }
+    
 }

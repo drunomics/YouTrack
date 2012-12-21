@@ -89,6 +89,13 @@ class YouTrackCommunicator
                 case 'State':
                     $issue->setStatus($fieldData['value'][0]);
                     break;
+                case 'links':
+                    foreach ($fieldData['value'] as $link) {
+                        if ($link['role'] == 'subtask of') {
+                            $issue->setParent($this->getIssue($link['value']));
+                        }
+                    }
+                    break;
             }
         }
         return $issue;

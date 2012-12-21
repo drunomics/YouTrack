@@ -20,6 +20,10 @@ class Issue {
     private $description;
     
     private $parent;
+    
+    private $estimate;
+    
+    private $children = array();
 
     public function getId()
     {
@@ -86,9 +90,30 @@ class Issue {
         return $this->parent;
     }
 
-    public function setParent(Issue $parent)
+    public function setParent(Issue $parent, $addChild = true )
     {
         $this->parent = $parent;
+        if( $addChild ) {
+            $parent->addChild( $this, false );
+        }
+    }
+    
+    public function setEstimate( $estimate ) {
+        $this->estimate = $estimate;
+    }
+    public function getEstimate() {
+        return $this->estimate;
+    }
+    
+    public function addChild( Issue $child, $addParent = true ) {
+        $this->children[] = $child;
+        if( $addParent ) {
+            $child->setParent( $this, false );
+        }
+    }
+    
+    public function getChildren() {
+        return $this->children;
     }
     
 }

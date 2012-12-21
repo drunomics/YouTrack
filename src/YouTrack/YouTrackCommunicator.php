@@ -18,6 +18,10 @@ class YouTrackCommunicator
 
     private $regexp = '[a-zA-Z_]+-\d+';
 
+    private $issueCache = array();
+    
+    private $toLoad = array();
+    
     public function __construct(Browser $browser, array $options)
     {
         $this->browser = $browser;
@@ -76,8 +80,10 @@ class YouTrackCommunicator
 
     private function parseIssueData($id, array $data)
     {
+        
         $issue = new Entity\Issue;
         $issue->setId($id);
+
         foreach ($data['field'] as $fieldData) {
             switch ($fieldData['name']) {
                 case 'summary':
@@ -92,9 +98,28 @@ class YouTrackCommunicator
                 case 'links':
                     foreach ($fieldData['value'] as $link) {
                         if ($link['role'] == 'subtask of') {
-                            $issue->setParent($this->getIssue($link['value']));
+                            if( array_key_exists( $link['value'], $this->issueCache ) ) {
+                                // already loaded, set connection
+                                $issue->setParent($this->getIssue($link['value']));
+                            }
+                            else {
+                                // this issue will also need to be loaded later (and the child will set the connection to the parent when loaded)
+                                $this->toLoad[ $link['value'] ] = true;
+                            }
+                        }
+                        if($link['role'] == 'parent for' ) {
+                            if( array_key_exists( $link['value'], $this->issueCache ) ) {
+                                $issue->addChild( $this->getIssue( $link['value']));
+                            }
+                            else {
+                                // this issue will need to be loaded later (and the parent will set the connection to the child when loaded)
+                                $this->toLoad[ $link['value'] ] = true;
+                            }
                         }
                     }
+                    break;
+                case 'Estimation':
+                    $issue->setEstimate( $fieldData['value'][0] );
                     break;
             }
         }
@@ -103,22 +128,29 @@ class YouTrackCommunicator
 
     public function getIssue($id)
     {
-        if ($id[0] == '#') {
-            throw new \InvalidArgumentException('Supply the issue ID without the #');
-        }
+        if( !isset( $this->issueCache[ $id ] )) {
+            if ($id[0] == '#') {
+                throw new \InvalidArgumentException('Supply the issue ID without the #');
+            }
 
-        $response = $this->browser->get($this->getOption('uri').'/rest/issue/'.$id, $this->buildHeaders());
-        if ($response->isNotFound()) {
-            return null;
-        }
-        if (!$response->isOk()) {
-            throw new Exception\APIException(__METHOD__, $response);
-        }
+            $response = $this->browser->get($this->getOption('uri').'/rest/issue/'.$id, $this->buildHeaders());
+            if ($response->isNotFound()) {
+                $this->issueCache[ $id ] = null;
+                return null;
+            }
+            if (!$response->isOk()) {
+                throw new Exception\APIException(__METHOD__, $response);
+            }
 
-        $issueData = json_decode($response->getContent(), true);
-        $issue = $this->parseIssueData($id, $issueData);
-
-        return $issue;
+            $issueData = json_decode($response->getContent(), true);
+            
+            // get any todo pushed to the list so that children/parents are set properly for this issue
+            $this->getTodo();
+            
+            $this->issueCache[ $id ] = $this->parseIssueData($id, $issueData);
+        }
+        
+        return $this->issueCache[ $id ];
     }
 
     public function getIssues(array $ids)
@@ -138,12 +170,26 @@ class YouTrackCommunicator
         $issues = array();
         $content = json_decode($response->getContent(), true);
         foreach ($content['issue'] as $issueData) {
-            $issues[] = $this->parseIssueData($issueData['id'], $issueData);
+            $this->issueCache[$issueData['id']] = $this->parseIssueData($issueData['id'], $issueData);
+            $issues[] = $this->issueCache[$issueData['id']];
         }
+        // get any todo pushed to the list, so that children/parents are set properly for this issue
+        $this->getTodo();
 
         return $issues;
     }
 
+    private function getTodo() {
+        // if we have a todo, load those issues as well
+        if( count( $this->toLoad ) > 0 ) {
+            $load = $this->toLoad;
+            $this->toLoad = array();
+            $issues = $this->getIssues( array_keys( $load ) );
+            return array_merge( $issues, $this->getTodo() );
+        }
+        return array();
+    }
+    
     public function executeCommands(Entity\Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
     {
         $post = array();

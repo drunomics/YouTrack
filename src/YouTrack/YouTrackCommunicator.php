@@ -16,7 +16,7 @@ class YouTrackCommunicator
 
     private $cookie = null;
 
-    private $regexp = '[a-zA-Z_]+-\d+';
+    private $regexp = '\w+-\d+';
 
     private $issueCache = array();
     

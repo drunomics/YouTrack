@@ -18,7 +18,7 @@ class APIException extends \RuntimeException
         $this->method = $method;
         $this->response = $response;
         
-        parent::__construct('The server responded with a '.$response->getStatusCode().' status code in method '.$method);
+        parent::__construct('The server responded with a '.$response->getStatusCode().' status code in method '.$method.': '.$response->getContent());
     }
     
     public function getMethod()

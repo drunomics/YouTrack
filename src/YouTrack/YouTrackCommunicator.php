@@ -236,19 +236,9 @@ class YouTrackCommunicator
 
     public function releaseVersion($project, $version)
     {
-        $response = $this->browser->get($this->getOption('uri').'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
-        if (!$response->isOk()) {
-            throw new Exception\APIException(__METHOD__, $response);
-        }
-        $fieldData = json_decode($response->getContent(), true);
-        $bundleName = $fieldData['param'][0]['value'];
+        $bundleName = $this->getFixVersionBundleName($project);
+        $versionsData = $this->getVersionData($bundleName);
 
-        $response = $this->browser->get($this->getOption('uri').'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
-        if (!$response->isOk()) {
-            throw new Exception\APIException(__METHOD__, $response);
-        }
-
-        $versionsData = json_decode($response->getContent(), true);
         $foundVersions = array();
         foreach($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
@@ -258,12 +248,56 @@ class YouTrackCommunicator
                     'released' => "true"
                 )));
                 if (!$response->isOk()) {
-                    throw new Exception\APIException(__METHOD__, $response);
+                    throw new Exception\APIException(__METHOD__, ' (tag version)', $response);
                 }
                 return true;
             }
         }
 
         throw new \InvalidArgumentException('The tagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
+    }
+
+    public function unreleaseVersion($project, $version)
+    {
+        $bundleName = $this->getFixVersionBundleName($project);
+        $versionsData = $this->getVersionData($bundleName);
+
+        $foundVersions = array();
+        foreach($versionsData['version'] as $versionData) {
+            $foundVersions[] = $versionData['value'];
+            if ($versionData['value'] == $version) {
+                $response = $this->browser->post($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
+                    'released' => "false"
+                )));
+                if (!$response->isOk()) {
+                    throw new Exception\APIException(__METHOD__.' (tag version)', $response);
+                }
+                return true;
+            }
+        }
+
+        throw new \InvalidArgumentException('The untagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
+    }
+    
+    private function getFixVersionBundleName($project) {
+        
+        $response = $this->browser->get($this->options['uri'].'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+        $fieldData = json_decode($response->getContent(), true);
+        return $fieldData['param'][0]['value'];
+    }
+    
+    private function getVersionData($bundleName)
+    {
+        
+
+        $response = $this->browser->get($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__.' (get version field data)', $response);
+        }
+        
+        return json_decode($response->getContent(), true);
     }
 }

@@ -3,7 +3,6 @@
 namespace YouTrack;
 
 use Buzz\Browser;
-use Buzz\Client\Curl;
 
 /**
  * @author Bart van den Burg <bart@samson-it.nl>

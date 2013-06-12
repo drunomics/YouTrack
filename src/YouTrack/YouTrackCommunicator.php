@@ -3,6 +3,7 @@
 namespace YouTrack;
 
 use Buzz\Browser;
+use Buzz\Client\FileGetContents;
 
 /**
  * @author Bart van den Burg <bart@samson-it.nl>
@@ -23,6 +24,9 @@ class YouTrackCommunicator
     
     public function __construct(Browser $browser, array $options)
     {
+        if ($browser->getClient() instanceof FileGetContents) {
+            throw new \InvalidArgumentException('The FileGetContents client is known not to work with this library. Please instantiate the Browser with an instance of \Buzz\Client\Curl');
+        }
         $this->browser = $browser;
         $this->options = $options;
     }

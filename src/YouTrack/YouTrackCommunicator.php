@@ -4,6 +4,7 @@ namespace YouTrack;
 
 use Buzz\Browser;
 use Buzz\Client\FileGetContents;
+use Buzz\Message\Response;
 
 /**
  * @author Bart van den Burg <bart@samson-it.nl>
@@ -156,6 +157,17 @@ class YouTrackCommunicator
         return $this->issueCache[ $id ];
     }
 
+    private function getIssuesFromResponse(Response $response)
+    {
+        $issues = array();
+        $content = json_decode($response->getContent(), true);
+        foreach ($content['issue'] as $issueData) {
+            $this->issueCache[$issueData['id']] = $this->parseIssueData($issueData['id'], $issueData);
+            $issues[] = $this->issueCache[$issueData['id']];
+        }
+        return $issues;
+    }
+
     public function getIssues(array $ids)
     {
         if (!count($ids)) {
@@ -170,15 +182,25 @@ class YouTrackCommunicator
             throw new Exception\APIException(__METHOD__, $response);
         }
 
-        $issues = array();
-        $content = json_decode($response->getContent(), true);
-        foreach ($content['issue'] as $issueData) {
-            $this->issueCache[$issueData['id']] = $this->parseIssueData($issueData['id'], $issueData);
-            $issues[] = $this->issueCache[$issueData['id']];
-        }
+        $issues = $this->getIssuesFromResponse($response);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
 
+        return $issues;
+    }
+
+    public function searchIssues($filter, $with = array(), $max = 10, $after = '')
+    {
+        $args = array_filter(array('filter' => $filter,'with' => $with,'max' => $max,'after' => $after));
+        $response = $this->browser->get($this->getOption('uri').'/rest/issue?'. http_build_query($args), $this->buildHeaders());
+
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+
+        $issues = $this->getIssuesFromResponse($response);
+        // get any todo pushed to the list, so that children/parents are set properly for this issue
+        $this->getTodo();
         return $issues;
     }
 

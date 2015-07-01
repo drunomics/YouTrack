@@ -4,9 +4,16 @@ namespace YouTrack;
 
 use Buzz\Browser;
 use Buzz\Client\FileGetContents;
+use Buzz\Exception\InvalidArgumentException;
 use Buzz\Message\Response;
+use YouTrack\Exception\APIException;
 
 /**
+ * REST wrapper api for youtrack.
+ *
+ * Docs:
+ * https://confluence.jetbrains.com/display/YTD4/YouTrack+REST+API+Reference
+ *
  * @author Bart van den Burg <bart@samson-it.nl>
  */
 class YouTrackCommunicator
@@ -17,12 +24,17 @@ class YouTrackCommunicator
 
     private $cookie = null;
 
-    private $regexp = '\w+-\d+';
+    private $regexp = '\w+-\d+' // youtrack issue id validation;
 
     private $issueCache = array();
-    
+
     private $toLoad = array();
-    
+
+    /**
+     * Mockable constructor.
+     * @param Browser $browser Buzz instance
+     * @param array   $options
+     */
     public function __construct(Browser $browser, array $options)
     {
         if ($browser->getClient() instanceof FileGetContents) {
@@ -32,19 +44,35 @@ class YouTrackCommunicator
         $this->options = $options;
     }
 
+    /**
+     * Exception throwing options fetcher.
+     * @throws InvalidArgumentException
+     * @param $option
+     * @return mixed
+     */
     protected function getOption($option)
     {
         if (!isset($this->options[$option])) {
             throw new \InvalidArgumentException('The option '.$option.' does not exist');
         }
+
         return $this->options[$option];
     }
 
+    /**
+     * Get handle to Buzz
+     * @return Browser
+     */
     protected function getBrowser()
     {
         return $this->browser;
     }
 
+    /**
+     * Set default JSON headers and cookie injection.
+     * @param  array $headers
+     * @return array
+     */
     protected function buildHeaders(array $headers = array())
     {
         if (null === $this->cookie) {
@@ -58,11 +86,16 @@ class YouTrackCommunicator
         return $headers;
     }
 
+    /**
+     * Login with the passed credentials.
+     * Stores cookie when login success,
+     * @throws APIException
+     */
     public function login()
     {
         $response = $this->browser->post($this->getOption('uri').'/rest/user/login', array(
             'Content-Type' => 'application/x-www-form-urlencoded'
-            ), array('login' => $this->getOption('username'), 'password' => $this->getOption('password')));
+        ), array('login' => $this->getOption('username'), 'password' => $this->getOption('password')));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -71,21 +104,42 @@ class YouTrackCommunicator
         $this->cookie = $response->getHeader('Set-Cookie', false);
     }
 
+    /**
+     *
+     * @param $string
+     * @return int
+     */
     public function supports($string)
     {
         return preg_match('/^'.$this->regexp.'$/', $string);
     }
 
+    /**
+     * Grab ticket id from a string.
+     * No idea where this is used from.
+     * @param $string
+     * @return mixed
+     */
     public function findIds($string)
     {
         preg_match_all('/#('.$this->regexp.')/', $string, $m);
+
         return $m[1];
     }
 
+    /**
+     * Parse issue data. Transform it into an Issue entity.
+     *
+     * Iterates parent issues so that it can build a tree structure with
+     * parent issue connected.
+     * @param $id
+     * @param  array        $data
+     * @return Entity\Issue
+     */
     private function parseIssueData($id, array $data)
     {
-        
-        $issue = new Entity\Issue;
+
+        $issue = new Entity\Issue();
         $issue->setId($id);
 
         foreach ($data['field'] as $fieldData) {
@@ -102,20 +156,18 @@ class YouTrackCommunicator
                 case 'links':
                     foreach ($fieldData['value'] as $link) {
                         if ($link['role'] == 'subtask of') {
-                            if( array_key_exists( $link['value'], $this->issueCache ) ) {
+                            if ( array_key_exists( $link['value'], $this->issueCache ) ) {
                                 // already loaded, set connection
                                 $issue->setParent($this->getIssue($link['value']));
-                            }
-                            else {
+                            } else {
                                 // this issue will also need to be loaded later (and the child will set the connection to the parent when loaded)
                                 $this->toLoad[ $link['value'] ] = true;
                             }
                         }
-                        if($link['role'] == 'parent for' ) {
-                            if( array_key_exists( $link['value'], $this->issueCache ) ) {
+                        if ($link['role'] == 'parent for') {
+                            if ( array_key_exists( $link['value'], $this->issueCache ) ) {
                                 $issue->addChild( $this->getIssue( $link['value']));
-                            }
-                            else {
+                            } else {
                                 // this issue will need to be loaded later (and the parent will set the connection to the child when loaded)
                                 $this->toLoad[ $link['value'] ] = true;
                             }
@@ -127,12 +179,20 @@ class YouTrackCommunicator
                     break;
             }
         }
+
         return $issue;
     }
 
+    /**
+     * Fetch an issue and it's parent / child issues from the rest API.
+     * Store it in $this->issueCache
+     * @throws APIException
+     * @param $id
+     * @return Issue
+     */
     public function getIssue($id)
     {
-        if( !isset( $this->issueCache[ $id ] )) {
+        if ( !isset( $this->issueCache[ $id ] )) {
             if ($id[0] == '#') {
                 throw new \InvalidArgumentException('Supply the issue ID without the #');
             }
@@ -140,6 +200,7 @@ class YouTrackCommunicator
             $response = $this->browser->get($this->getOption('uri').'/rest/issue/'.$id, $this->buildHeaders());
             if ($response->isNotFound()) {
                 $this->issueCache[ $id ] = null;
+
                 return null;
             }
             if (!$response->isOk()) {
@@ -147,16 +208,22 @@ class YouTrackCommunicator
             }
 
             $issueData = json_decode($response->getContent(), true);
-            
+
             // get any todo pushed to the list so that children/parents are set properly for this issue
             $this->getTodo();
-            
+
             $this->issueCache[ $id ] = $this->parseIssueData($id, $issueData);
         }
-        
+
         return $this->issueCache[ $id ];
     }
 
+    /**
+     * Parse and cache rest response for issue id
+     *
+     * @param  Response     $response
+     * @return array[Issue]
+     */
     private function getIssuesFromResponse(Response $response)
     {
         $issues = array();
@@ -165,15 +232,22 @@ class YouTrackCommunicator
             $this->issueCache[$issueData['id']] = $this->parseIssueData($issueData['id'], $issueData);
             $issues[] = $this->issueCache[$issueData['id']];
         }
+
         return $issues;
     }
 
+    /**
+     * Fetch a list of issues from the api.
+     *
+     * @param  array        $ids
+     * @return array[Issue]
+     */
     public function getIssues(array $ids)
     {
         if (!count($ids)) {
             return array();
         }
-        $search = implode("%20", array_map(function($id) {
+        $search = implode("%20", array_map(function ($id) {
             return "%23$id";
         }, $ids));
         $response = $this->browser->get($this->getOption('uri').'/rest/issue?filter='.$search, $this->buildHeaders());
@@ -189,6 +263,14 @@ class YouTrackCommunicator
         return $issues;
     }
 
+    /**
+     * Find a list of issues for a youtrack format filter
+     * @param $filter
+     * @param  array        $with
+     * @param  int          $max
+     * @param  string       $after
+     * @return array[Issue]
+     */
     public function searchIssues($filter, $with = array(), $max = 10, $after = '')
     {
         $args = array_filter(array('filter' => $filter,'with' => $with,'max' => $max,'after' => $after));
@@ -201,20 +283,42 @@ class YouTrackCommunicator
         $issues = $this->getIssuesFromResponse($response);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
+
         return $issues;
     }
 
-    private function getTodo() {
+    /**
+     * Internal method to fetch issues that we still need to fetch from the API.
+     * Recursively calls itself until it fetched all parent/child issues
+     * @return array
+     */
+    private function getTodo()
+    {
         // if we have a todo, load those issues as well
-        if( count( $this->toLoad ) > 0 ) {
+        if ( count( $this->toLoad ) > 0 ) {
             $load = $this->toLoad;
             $this->toLoad = array();
             $issues = $this->getIssues( array_keys( $load ) );
+
             return array_merge( $issues, $this->getTodo() );
         }
+
         return array();
     }
-    
+
+    /**
+     * Apply a command on an issue.
+     *
+     * @see https://confluence.jetbrains.com/display/YTD4/Command+Grammar
+     * @see https://confluence.jetbrains.com/display/YTD4/Search+and+Command+Attributes
+     * @see https://confluence.jetbrains.com/display/YTD3/Apply+Command+to+an+Issue
+     * @param Entity\Issue $issue    to execute commands on
+     * @param array        $commands array of string commands (will be joined)
+     * @param $comment A comment to add to an issue.
+     * @param string       $group    User group name. Use to specify visibility settings of a comment to be post.
+     * @param bool         $silent   If set 'true' then no notifications about changes made with the specified command will be send. By default, is 'false'.
+     * @param null         $runAs    Login for a user on whose behalf the command should be executed. (Note, that to use runAs parameter you should have Update project permission in issue's project)
+     */
     public function executeCommands(Entity\Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
     {
         $post = array();
@@ -235,6 +339,13 @@ class YouTrackCommunicator
         }
     }
 
+    /**
+     * Find a youtrack internal username by passing an email
+     *
+     * @throws APIException
+     * @param $email
+     * @return Login        | null
+     */
     public function findUserName($email)
     {
         $response = $this->browser->get($this->getOption('uri').'/rest/admin/user?q='.$email, $this->buildHeaders());
@@ -259,13 +370,20 @@ class YouTrackCommunicator
         return null;
     }
 
+    /**
+     * Set a specific 'Fix Version' to 'released.' at current date.
+     * @deprecated
+     * @param $project
+     * @param $version
+     * @return bool
+     */
     public function releaseVersion($project, $version)
     {
         $bundleName = $this->getFixVersionBundleName($project);
         $versionsData = $this->getVersionData($bundleName);
 
         $foundVersions = array();
-        foreach($versionsData['version'] as $versionData) {
+        foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
                 $response = $this->browser->post($this->getOption('uri').'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
@@ -275,6 +393,7 @@ class YouTrackCommunicator
                 if (!$response->isOk()) {
                     throw new Exception\APIException(__METHOD__, ' (tag version)', $response);
                 }
+
                 return true;
             }
         }
@@ -282,13 +401,22 @@ class YouTrackCommunicator
         throw new \InvalidArgumentException('The tagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
     }
 
+    /**
+     * Set a specific 'Fix Version' to 'released.' at current date.
+     * @throws APIException
+     * @throws InvalidArgumentException
+     * @deprecated
+     * @param $project
+     * @param $version
+     * @return bool
+     */
     public function unreleaseVersion($project, $version)
     {
         $bundleName = $this->getFixVersionBundleName($project);
         $versionsData = $this->getVersionData($bundleName);
 
         $foundVersions = array();
-        foreach($versionsData['version'] as $versionData) {
+        foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
                 $response = $this->browser->post($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
@@ -297,32 +425,45 @@ class YouTrackCommunicator
                 if (!$response->isOk()) {
                     throw new Exception\APIException(__METHOD__.' (tag version)', $response);
                 }
+
                 return true;
             }
         }
 
         throw new \InvalidArgumentException('The untagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
     }
-    
-    private function getFixVersionBundleName($project) {
-        
+
+    /**
+     * Fetch the list of 'fix versions' for a project
+     * @throws APIException on failure
+     * @param $project youtrack project name
+     * @return first        fix version from the list
+     */
+    private function getFixVersionBundleName($project)
+    {
         $response = $this->browser->get($this->options['uri'].'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
         $fieldData = json_decode($response->getContent(), true);
+
         return $fieldData['param'][0]['value'];
     }
-    
+
+    /**
+     * Grab one of the version fields from the versionbundle
+     * Fetches information on if a version was released, when, and on if it is active.
+     * @see https://confluence.jetbrains.com/display/YTD3/Get+a+Version+Bundle
+     * @param $bundleName
+     * @return mixed
+     */
     private function getVersionData($bundleName)
     {
-        
-
         $response = $this->browser->get($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__.' (get version field data)', $response);
         }
-        
+
         return json_decode($response->getContent(), true);
     }
 }

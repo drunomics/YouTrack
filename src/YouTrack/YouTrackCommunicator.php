@@ -24,7 +24,7 @@ class YouTrackCommunicator
 
     private $cookie = null;
 
-    private $regexp = '\w+-\d+' // youtrack issue id validation;
+    private $regexp = '\w+-\d+'; // youtrack issue id validation;
 
     private $issueCache = array();
 

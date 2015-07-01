@@ -19,21 +19,17 @@ use YouTrack\Exception\APIException;
 class YouTrackCommunicator
 {
     private $browser;
-
     private $options;
-
     private $cookie = null;
-
     private $regexp = '\w+-\d+'; // youtrack issue id validation;
-
-    private $issueCache = array();
-
+    private $issueCache = array(); // unique map of all issues.
+    private $projectCache = array(); // unique map of all projects attached to issues.
     private $toLoad = array();
 
     /**
      * Mockable constructor.
      * @param Browser $browser Buzz instance
-     * @param array   $options
+     * @param array $options
      */
     public function __construct(Browser $browser, array $options)
     {
@@ -53,9 +49,8 @@ class YouTrackCommunicator
     protected function getOption($option)
     {
         if (!isset($this->options[$option])) {
-            throw new \InvalidArgumentException('The option '.$option.' does not exist');
+            throw new \InvalidArgumentException('The option ' . $option . ' does not exist');
         }
-
         return $this->options[$option];
     }
 
@@ -79,10 +74,9 @@ class YouTrackCommunicator
             $this->login();
         }
         foreach ($this->cookie as $cookie) {
-            $headers[] = 'Cookie: '.$cookie;
+            $headers[] = 'Cookie: ' . $cookie;
         }
         $headers[] = 'Accept: application/json';
-
         return $headers;
     }
 
@@ -93,14 +87,13 @@ class YouTrackCommunicator
      */
     public function login()
     {
-        $response = $this->browser->post($this->getOption('uri').'/rest/user/login', array(
+        $response = $this->browser->post($this->getOption('uri') . '/rest/user/login', array(
             'Content-Type' => 'application/x-www-form-urlencoded'
         ), array('login' => $this->getOption('username'), 'password' => $this->getOption('password')));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
-
         $this->cookie = $response->getHeader('Set-Cookie', false);
     }
 
@@ -111,7 +104,7 @@ class YouTrackCommunicator
      */
     public function supports($string)
     {
-        return preg_match('/^'.$this->regexp.'$/', $string);
+        return preg_match('/^' . $this->regexp . '$/', $string);
     }
 
     /**
@@ -122,8 +115,7 @@ class YouTrackCommunicator
      */
     public function findIds($string)
     {
-        preg_match_all('/#('.$this->regexp.')/', $string, $m);
-
+        preg_match_all('/#(' . $this->regexp . ')/', $string, $m);
         return $m[1];
     }
 
@@ -133,22 +125,25 @@ class YouTrackCommunicator
      * Iterates parent issues so that it can build a tree structure with
      * parent issue connected.
      * @param $id
-     * @param  array        $data
+     * @param  array $data
      * @return Entity\Issue
      */
     private function parseIssueData($id, array $data)
     {
-
         $issue = new Entity\Issue();
         $issue->setId($id);
+
+        if (array_key_exists('projectShortName', $data['field'])) {
+            $issue->setProject($data['field']['value']);
+        }
 
         foreach ($data['field'] as $fieldData) {
             switch ($fieldData['name']) {
                 case 'summary':
                     $issue->setSummary($fieldData['value']);
                     break;
-                case 'projectShortName':
-                    $issue->setProject($fieldData['value']);
+                case 'projectId': // does this even still work?
+                    $issue->getProjectEntity()->setId($fieldData['value']);
                     break;
                 case 'State':
                     $issue->setStatus($fieldData['value'][0]);
@@ -156,26 +151,26 @@ class YouTrackCommunicator
                 case 'links':
                     foreach ($fieldData['value'] as $link) {
                         if ($link['role'] == 'subtask of') {
-                            if ( array_key_exists( $link['value'], $this->issueCache ) ) {
+                            if (array_key_exists($link['value'], $this->issueCache)) {
                                 // already loaded, set connection
                                 $issue->setParent($this->getIssue($link['value']));
                             } else {
                                 // this issue will also need to be loaded later (and the child will set the connection to the parent when loaded)
-                                $this->toLoad[ $link['value'] ] = true;
+                                $this->toLoad[$link['value']] = true;
                             }
                         }
                         if ($link['role'] == 'parent for') {
-                            if ( array_key_exists( $link['value'], $this->issueCache ) ) {
-                                $issue->addChild( $this->getIssue( $link['value']));
+                            if (array_key_exists($link['value'], $this->issueCache)) {
+                                $issue->addChild($this->getIssue($link['value']));
                             } else {
                                 // this issue will need to be loaded later (and the parent will set the connection to the child when loaded)
-                                $this->toLoad[ $link['value'] ] = true;
+                                $this->toLoad[$link['value']] = true;
                             }
                         }
                     }
                     break;
                 case 'Estimation':
-                    $issue->setEstimate( $fieldData['value'][0] );
+                    $issue->setEstimate($fieldData['value'][0]);
                     break;
             }
         }
@@ -185,6 +180,7 @@ class YouTrackCommunicator
 
     /**
      * Fetch an issue and it's parent / child issues from the rest API.
+     * preFetch config for project and inject it onto the issue
      * Store it in $this->issueCache
      * @throws APIException
      * @param $id
@@ -192,14 +188,14 @@ class YouTrackCommunicator
      */
     public function getIssue($id)
     {
-        if ( !isset( $this->issueCache[ $id ] )) {
+        if (!isset($this->issueCache[$id])) {
             if ($id[0] == '#') {
                 throw new \InvalidArgumentException('Supply the issue ID without the #');
             }
 
-            $response = $this->browser->get($this->getOption('uri').'/rest/issue/'.$id, $this->buildHeaders());
+            $response = $this->browser->get($this->getOption('uri') . '/rest/issue/' . $id, $this->buildHeaders());
             if ($response->isNotFound()) {
-                $this->issueCache[ $id ] = null;
+                $this->issueCache[$id] = null;
 
                 return null;
             }
@@ -209,19 +205,54 @@ class YouTrackCommunicator
 
             $issueData = json_decode($response->getContent(), true);
 
-            // get any todo pushed to the list so that children/parents are set properly for this issue
-            $this->getTodo();
+            $project = $this->preFetchProject($issueData); // prefetch project data and config for issue when not cached.
 
-            $this->issueCache[ $id ] = $this->parseIssueData($id, $issueData);
+            $this->getTodo(); // fetch issues that are on the 'to fetch' list so that children/parents are set properly for this issue
+
+            $issue = $this->parseIssueData($id, $issueData); // parse issue arraydata into an entity.
+            $issue->setProjectEntity($project); // set prefetched project onto entity.
+
+            $this->issueCache[$id] = $issue; //inject issue into issuecache.
+        }
+        return $this->issueCache[$id];
+    }
+
+    /**
+     * Prefetch the project entity, or return a precached one from the projectCache array.
+     * When the project doesn't exist yet, it creates the new entity and fetches TimeTrack settings
+     *
+     * When timetrack settings are enabled on the project, they can also be fetched for the Issue entity.
+     *
+     * @param $issueData
+     * @return Project | null
+     * @throws \InvalidArgumentException
+     */
+    private function preFetchProject($issueData)
+    {
+        $projectName = null;
+        foreach ($issueData['field'] as $idx => $info) {
+            if ($info['name'] == 'projectShortName') {
+                $projectName = $info['value'];
+                break;
+            }
         }
 
-        return $this->issueCache[ $id ];
+        if ($projectName == null) {
+            throw \InvalidArgumentException("No Project found for issue {$issue['id']}");
+        } else {
+            if (!array_key_exists($projectName, $this->projectCache)) {
+                $project = new Entity\Project($projectName);
+                $project->setSettings($this->getTimeTrackingSettings($project));
+                $this->projectCache[$projectName] = $project;
+            }
+            return $this->projectCache[$projectName];
+        }
     }
 
     /**
      * Parse and cache rest response for issue id
      *
-     * @param  Response     $response
+     * @param  Response $response
      * @return array[Issue]
      */
     private function getIssuesFromResponse(Response $response)
@@ -239,7 +270,7 @@ class YouTrackCommunicator
     /**
      * Fetch a list of issues from the api.
      *
-     * @param  array        $ids
+     * @param  array $ids
      * @return array[Issue]
      */
     public function getIssues(array $ids)
@@ -250,7 +281,7 @@ class YouTrackCommunicator
         $search = implode("%20", array_map(function ($id) {
             return "%23$id";
         }, $ids));
-        $response = $this->browser->get($this->getOption('uri').'/rest/issue?filter='.$search, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri') . '/rest/issue?filter=' . $search, $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -266,15 +297,15 @@ class YouTrackCommunicator
     /**
      * Find a list of issues for a youtrack format filter
      * @param $filter
-     * @param  array        $with
-     * @param  int          $max
-     * @param  string       $after
+     * @param  array $with
+     * @param  int $max
+     * @param  string $after
      * @return array[Issue]
      */
     public function searchIssues($filter, $with = array(), $max = 10, $after = '')
     {
-        $args = array_filter(array('filter' => $filter,'with' => $with,'max' => $max,'after' => $after));
-        $response = $this->browser->get($this->getOption('uri').'/rest/issue?'. http_build_query($args), $this->buildHeaders());
+        $args = array_filter(array('filter' => $filter, 'with' => $with, 'max' => $max, 'after' => $after));
+        $response = $this->browser->get($this->getOption('uri') . '/rest/issue?' . http_build_query($args), $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -295,12 +326,12 @@ class YouTrackCommunicator
     private function getTodo()
     {
         // if we have a todo, load those issues as well
-        if ( count( $this->toLoad ) > 0 ) {
+        if (count($this->toLoad) > 0) {
             $load = $this->toLoad;
             $this->toLoad = array();
-            $issues = $this->getIssues( array_keys( $load ) );
+            $issues = $this->getIssues(array_keys($load));
 
-            return array_merge( $issues, $this->getTodo() );
+            return array_merge($issues, $this->getTodo());
         }
 
         return array();
@@ -312,31 +343,32 @@ class YouTrackCommunicator
      * @see https://confluence.jetbrains.com/display/YTD4/Command+Grammar
      * @see https://confluence.jetbrains.com/display/YTD4/Search+and+Command+Attributes
      * @see https://confluence.jetbrains.com/display/YTD3/Apply+Command+to+an+Issue
-     * @param Entity\Issue $issue    to execute commands on
-     * @param array        $commands array of string commands (will be joined)
+     * @param Entity\Issue $issue to execute commands on
+     * @param array $commands array of string commands (will be joined)
      * @param $comment A comment to add to an issue.
-     * @param string       $group    User group name. Use to specify visibility settings of a comment to be post.
-     * @param bool         $silent   If set 'true' then no notifications about changes made with the specified command will be send. By default, is 'false'.
-     * @param null         $runAs    Login for a user on whose behalf the command should be executed. (Note, that to use runAs parameter you should have Update project permission in issue's project)
+     * @param string $group User group name. Use to specify visibility settings of a comment to be post.
+     * @param bool $silent If set 'true' then no notifications about changes made with the specified command will be send. By default, is 'false'.
+     * @param null $runAs Login for a user on whose behalf the command should be executed. (Note, that to use runAs parameter you should have Update project permission in issue's project)
      */
     public function executeCommands(Entity\Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
     {
         $post = array();
-        $post[] = 'command='.urlencode(implode(" ", $commands));
-        $post[] = 'comment='.urlencode($comment);
-        $post[] = 'disableNotifications='.($silent ? 'true' : 'false');
+        $post[] = 'command=' . urlencode(implode(" ", $commands));
+        $post[] = 'comment=' . urlencode($comment);
+        $post[] = 'disableNotifications=' . ($silent ? 'true' : 'false');
         if (null !== $group) {
-            $post[] = 'group='.urlencode($group);
+            $post[] = 'group=' . urlencode($group);
         }
         if (null !== $runAs) {
-            $post[] = 'runAs='.$runAs;
+            $post[] = 'runAs=' . $runAs;
         }
 
-        $response = $this->browser->post($this->getOption('uri').'/rest/issue/'.$issue->getId().'/execute', $this->buildHeaders(), implode("&", $post));
+        $response = $this->browser->post($this->getOption('uri') . '/rest/issue/' . $issue->getId() . '/execute', $this->buildHeaders(), implode("&", $post));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
+        return $response;
     }
 
     /**
@@ -348,7 +380,7 @@ class YouTrackCommunicator
      */
     public function findUserName($email)
     {
-        $response = $this->browser->get($this->getOption('uri').'/rest/admin/user?q='.$email, $this->buildHeaders());
+        $response = $this->browser->get($this->getOption('uri') . '/rest/admin/user?q=' . $email, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -386,8 +418,8 @@ class YouTrackCommunicator
         foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
-                $response = $this->browser->post($this->getOption('uri').'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
-                    'releaseDate' => time().'000',
+                $response = $this->browser->post($this->getOption('uri') . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
+                    'releaseDate' => time() . '000',
                     'released' => "true"
                 )));
                 if (!$response->isOk()) {
@@ -398,7 +430,7 @@ class YouTrackCommunicator
             }
         }
 
-        throw new \InvalidArgumentException('The tagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
+        throw new \InvalidArgumentException('The tagged version does not exist in YouTrack (found: ' . implode(", ", $foundVersions) . ')');
     }
 
     /**
@@ -419,18 +451,18 @@ class YouTrackCommunicator
         foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
-                $response = $this->browser->post($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName.'/'.$version, $this->buildHeaders(), http_build_query(array(
+                $response = $this->browser->post($this->options['uri'] . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
                     'released' => "false"
                 )));
                 if (!$response->isOk()) {
-                    throw new Exception\APIException(__METHOD__.' (tag version)', $response);
+                    throw new Exception\APIException(__METHOD__ . ' (tag version)', $response);
                 }
 
                 return true;
             }
         }
 
-        throw new \InvalidArgumentException('The untagged version does not exist in YouTrack (found: '.implode(", ", $foundVersions).')');
+        throw new \InvalidArgumentException('The untagged version does not exist in YouTrack (found: ' . implode(", ", $foundVersions) . ')');
     }
 
     /**
@@ -441,7 +473,7 @@ class YouTrackCommunicator
      */
     private function getFixVersionBundleName($project)
     {
-        $response = $this->browser->get($this->options['uri'].'/rest/admin/project/'.$project.'/customfield/Fix%20versions', $this->buildHeaders());
+        $response = $this->browser->get($this->options['uri'] . '/rest/admin/project/' . $project . '/customfield/Fix%20versions', $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -459,11 +491,63 @@ class YouTrackCommunicator
      */
     private function getVersionData($bundleName)
     {
-        $response = $this->browser->get($this->options['uri'].'/rest/admin/customfield/versionBundle/'.$bundleName, $this->buildHeaders());
+        $response = $this->browser->get($this->options['uri'] . '/rest/admin/customfield/versionBundle/' . $bundleName, $this->buildHeaders());
         if (!$response->isOk()) {
-            throw new Exception\APIException(__METHOD__.' (get version field data)', $response);
+            throw new Exception\APIException(__METHOD__ . ' (get version field data)', $response);
         }
 
         return json_decode($response->getContent(), true);
+    }
+
+    /**
+     * Fetch timetracking settings for the project.
+     * Response includes at least an 'enabled' (0 | 1) field.
+     * If Enabled == 1, you will also receive a list of enabled fields that can be queried using the project/customField api.
+     * @param Entity\Project $project
+     * @return mixed
+     */
+    private function getTimeTrackingSettings(Entity\Project $project)
+    {
+        $response = $this->browser->get($this->options['uri'] . '/rest/admin/project/' . $project->getName() . '/timetracking', $this->buildHeaders());
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+        return json_decode($response->getContent(), true);
+    }
+
+    /**
+     * Tracks time on an issue instance passed.
+     * Whenever a project has the 'time tracking' setting enabled, this will write an amount of minutes on an issue
+     *
+     * @param Entity\Issue $issue
+     * @param int $time
+     * @param string $comment
+     */
+    public function trackTimeOnIssue(Entity\Issue $issue, $time = 0, $comment = 'Added via YouTrackCommunicator API.')
+    {
+        if ($issue->getProjectEntity()->getSetting('enabled') == 1) {
+            print_r("Saving time enabled! {$time} {$comment} \n");
+
+
+            // todo: check if we can post as json
+            // otherwise: post as xml.
+            $response = $this->browser->post($this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem', $this->buildHeaders(), json_encode(array(
+                        "workitem" => array(
+                            "date" => 1353316956611,
+                            "duration" => 240,
+                            "description" => "test work item",
+                            "worktype" => array (
+                                "name" => "Development"
+                            )
+                        )
+                    )
+                )
+            );
+
+            if (!$response->isOk()) {
+                throw new Exception\APIException(__METHOD__ . ' (tag version)', $response);
+            }
+
+        }
     }
 }

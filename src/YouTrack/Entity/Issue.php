@@ -3,27 +3,22 @@
 namespace YouTrack\Entity;
 
 /**
+ * YouTrack Issue Entity.
+ * Wrapper for the interesting information of a project.
+ *
  * @author Bart van den Burg <bart@samson-it.nl>
  */
 class Issue {
 
     private $id;
-
-    private $project;
-
-    private $projectId;
-
+    private $projectEntity;
     private $status;
-
     private $summary;
-
     private $description;
-    
     private $parent;
-    
     private $estimate;
-    
     private $children = array();
+    private $timetrackEntries = array();
 
     public function getId()
     {
@@ -35,24 +30,35 @@ class Issue {
         $this->id = $id;
     }
 
-    public function getProjectId()
-    {
-        return $this->projectId;
+    /**
+     * Project detail data (name, config, etc)
+     * @return mixed
+     */
+    public function getProjectEntity() {
+        return $this->projectEntity;
     }
 
-    public function setProjectId($projectId)
-    {
-        $this->projectId = $projectId;
+    /**
+     * Set the project detail data.
+     * @param Project $project
+     */
+    public function setProjectEntity(Project $project) {
+        $this->projectEntity = $project;
     }
 
+    /**
+     * return Project Name.
+     * Method not renamed for historical reasons.
+     * @return mixed
+     */
     public function getProject()
     {
-        return $this->project;
+        return $this->projectEntity->getName();
     }
 
     public function setProject($project)
     {
-        $this->project = $project;
+        $this->projectEntity->setName($project);
     }
 
     public function getStatus()
@@ -90,6 +96,11 @@ class Issue {
         return $this->parent;
     }
 
+    /**
+     * Add a parent relationship to another issue for this issue.
+     * @param Issue $parent
+     * @param bool $addChild
+     */
     public function setParent(Issue $parent, $addChild = true )
     {
         $this->parent = $parent;
@@ -97,14 +108,24 @@ class Issue {
             $parent->addChild( $this, false );
         }
     }
-    
+
+    /**
+     * Store estimate property
+     * @param $estimate
+     */
     public function setEstimate( $estimate ) {
         $this->estimate = $estimate;
     }
+
     public function getEstimate() {
         return $this->estimate;
     }
-    
+
+    /**
+     * Add a child relationship to another issue for this issue.
+     * @param Issue $child
+     * @param bool $addParent
+     */
     public function addChild( Issue $child, $addParent = true ) {
         $this->children[] = $child;
         if( $addParent ) {
@@ -115,5 +136,22 @@ class Issue {
     public function getChildren() {
         return $this->children;
     }
-    
+
+    /**
+     * @return array
+     */
+    public function getTimetrackEntries()
+    {
+        return $this->timetrackEntries;
+    }
+
+    /**
+     * @param array $timetrackEntries
+     */
+    public function setTimetrackEntries($timetrackEntries)
+    {
+        $this->timetrackEntries = $timetrackEntries;
+    }
+
+
 }

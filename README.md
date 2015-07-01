@@ -8,7 +8,14 @@ Fetches issues as nice Issue entities.
 Usage:
 
 ```
-$api = new \YouTrack\YouTrackCommunicator(\Buzz\Browser, array(
+require('src/YouTrack/YouTrackCommunicator.php');
+require('vendor/autoload.php');
+
+
+$client = new Buzz\Browser;
+$client->setClient(new Buzz\Client\Curl());
+
+$api = new \YouTrack\YouTrackCommunicator($client, array(
     'uri' => 'http://your.youtrack.base',
     'username' => 'your_api_user',
     'password' => 'your_api_password'
@@ -17,7 +24,7 @@ $api = new \YouTrack\YouTrackCommunicator(\Buzz\Browser, array(
 $myIssue = $api->getIssue('MYPRJ-1');
 var_dump($myIssue);
 
-$api->executeCommands($myIssue, 'Fixed', 'I just closed this automagically.');
+$api->executeCommands($myIssue, ['State', 'Built'], 'I just closed this automagically.');
 ```
 
 For more info on what commands you can use, check the YouTrack docs:

@@ -6,6 +6,7 @@ use Buzz\Browser;
 use Buzz\Client\FileGetContents;
 use Buzz\Exception\InvalidArgumentException;
 use Buzz\Message\Response;
+use YouTrack\Entity\WorkItem;
 use YouTrack\Exception\APIException;
 
 /**
@@ -517,37 +518,80 @@ class YouTrackCommunicator
 
     /**
      * Tracks time on an issue instance passed.
-     * Whenever a project has the 'time tracking' setting enabled, this will write an amount of minutes on an issue
+     * Whenever a project has the 'time tracking' setting enabled, this will sum up the amount of minutes booked on an issue
+     * When it' s not enabled, you can still log work on an issue, it just doens't show up in the totals.
      *
+     * @see https://confluence.jetbrains.com/display/YTD6/Create%20New%20Work%20Item
      * @param Entity\Issue $issue
-     * @param int $time
-     * @param string $comment
+     * @param int $timeToBook in minutes
+     * @param string $comment (optional, default: "Added via YouTrackCommunicator API"))
+     * @param string $type (optional, default: "Development"). Possible: One of the allowed types by YouTrack: 'No type', 'Development', 'Testing', 'Documentation'
+     * @return boolean added
      */
-    public function trackTimeOnIssue(Entity\Issue $issue, $time = 0, $comment = 'Added via YouTrackCommunicator API.')
+    public function trackTimeOnIssue(Entity\Issue $issue, $timeToBook = 0, $comment = 'Added via YouTrackCommunicator API.', $type='Development')
     {
+        $output = false;
+
         if ($issue->getProjectEntity()->getSetting('enabled') == 1) {
-            print_r("Saving time enabled! {$time} {$comment} \n");
+
+            $xml = sprintf("<workItem>
+                <date>%s</date>
+                <duration>%d</duration>
+                <description>%s</description>
+                <worktype><name>%s</name></worktype>
+                </workItem>", time() * 1000, $timeToBook, $comment, $type);
+
+            $response = $this->browser->post(
+                $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
+                $this->buildHeaders(array('Content-Type: application/xml; charset=UTF-8','Content-Length: '.strlen($xml))),
+                $xml);
+
+            if($response->getStatusCode() != 201) {
+                throw new Exception\APIException(__METHOD__ . ' WorkItem record not created. ', $response);
+            } else {
+                $output = true;
+            }
+        }
+        return $output;
+    }
 
 
-            // todo: check if we can post as json
-            // otherwise: post as xml.
-            $response = $this->browser->post($this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem', $this->buildHeaders(), json_encode(array(
-                        "workitem" => array(
-                            "date" => 1353316956611,
-                            "duration" => 240,
-                            "description" => "test work item",
-                            "worktype" => array (
-                                "name" => "Development"
-                            )
-                        )
-                    )
-                )
-            );
+    /**
+     * Fetch WorkItem list for an issue (TimeTracking instances)
+     * Removes some cruft and returns them as WorkItem entities.
+     * @param Entity\Issue $issue
+     * @return Array(Entity\WorkItem)
+     */
+    public function getWorkItemsForIssue(Entity\Issue $issue) {
 
-            if (!$response->isOk()) {
-                throw new Exception\APIException(__METHOD__ . ' (tag version)', $response);
+        $response = $this->browser->get(
+            $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
+            $this->buildHeaders());
+
+        if (!$response->isOk()) {
+            throw new Exception\APIException(__METHOD__ . ' Could not fetch workItem records. ', $response);
+        } else {
+            $output = array();
+            $items = json_decode($response->getContent());
+
+            foreach ($items as $item) {
+                $labour = new Entity\WorkItem();
+                $labour->setId($item->id);
+                $labour->setWorkItemUrl($item->url);
+                $labour->setAuthorUrl($item->author->url);
+                $labour->setDate($item->date);
+                $labour->setDuration($item->duration);
+                $labour->setAuthorName($item->author->login);
+                $labour->setComment($item->description);
+                $labour->setType($item->worktype->name);
+
+                $output[] = $labour;
             }
 
+            return $output;
         }
     }
+
+
+
 }

@@ -17,7 +17,7 @@ class WorkItem
     private $comment;
     private $date;
     private $duration = 0;
-    private $type = array();
+    private $type;
     private $authorName;
     private $authorUrl;
     private $workItemUrl;
@@ -113,7 +113,7 @@ class WorkItem
     }
 
     /**
-     * @return array
+     * @return string
      */
     public function getType()
     {
@@ -121,7 +121,7 @@ class WorkItem
     }
 
     /**
-     * @param array $type
+     * @param string $type
      * @return WorkItem
      */
     public function setType($type)

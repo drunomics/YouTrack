@@ -261,7 +261,10 @@ class YouTrackCommunicator
         $issues = array();
         $content = json_decode($response->getContent(), true);
         foreach ($content['issue'] as $issueData) {
-            $this->issueCache[$issueData['id']] = $this->parseIssueData($issueData['id'], $issueData);
+            $issue = $this->parseIssueData($issueData['id'], $issueData);
+            $issue->setProjectEntity($this->preFetchProject($issueData)); // set prefetched project onto entity.
+            $this->getWorkItemsForIssue($issue);
+            $this->issueCache[$issueData['id']] = $issue;
             $issues[] = $this->issueCache[$issueData['id']];
         }
 
@@ -289,6 +292,7 @@ class YouTrackCommunicator
         }
 
         $issues = $this->getIssuesFromResponse($response);
+
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
 
@@ -350,6 +354,8 @@ class YouTrackCommunicator
      * @param string $group User group name. Use to specify visibility settings of a comment to be post.
      * @param bool $silent If set 'true' then no notifications about changes made with the specified command will be send. By default, is 'false'.
      * @param null $runAs Login for a user on whose behalf the command should be executed. (Note, that to use runAs parameter you should have Update project permission in issue's project)
+     *
+     * @return mixed API Response
      */
     public function executeCommands(Entity\Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
     {
@@ -377,7 +383,7 @@ class YouTrackCommunicator
      *
      * @throws APIException
      * @param $email
-     * @return Login        | null
+     * @return Login | null
      */
     public function findUserName($email)
     {

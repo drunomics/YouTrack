@@ -109,10 +109,13 @@ class YouTrackCommunicator
     }
 
     /**
-     * Grab ticket id from a string.
-     * No idea where this is used from.
+     * Public interface to parse a string for YouTrack Issue ID's ( #projectshortname-[0-9]+ )
+     * You can basically pass a standard git commit string to this function and it will fetch an array of
+     * Youtrack id's, which you can then validate by fetching them all with self::getIssues
+     *
+     * @see getIssues
      * @param $string
-     * @return mixed
+     * @return array of string id's.
      */
     public function findIds($string)
     {
@@ -239,7 +242,7 @@ class YouTrackCommunicator
         }
 
         if ($projectName == null) {
-            throw \InvalidArgumentException("No Project found for issue {$issue['id']}");
+            throw \InvalidArgumentException("No Project found for issue {$issueData['id']}");
         } else {
             if (!array_key_exists($projectName, $this->projectCache)) {
                 $project = new Entity\Project($projectName);
@@ -263,7 +266,15 @@ class YouTrackCommunicator
         foreach ($content['issue'] as $issueData) {
             $issue = $this->parseIssueData($issueData['id'], $issueData);
             $issue->setProjectEntity($this->preFetchProject($issueData)); // set prefetched project onto entity.
-            $this->getWorkItemsForIssue($issue);
+            try {
+                $this->getWorkItemsForIssue($issue);
+            } catch(APIException $E) {
+                if(stripos($E->getMessage(), "is disabled") !== false) { // catch "time tracking is disabled messages, handle silently."
+                    // do nothing.
+                } else {
+                    throw $E;
+                }
+            }
             $this->issueCache[$issueData['id']] = $issue;
             $issues[] = $this->issueCache[$issueData['id']];
         }

@@ -19,17 +19,21 @@ $client = new Buzz\Browser;
 $client->setClient(new Buzz\Client\Curl());
 
 $api = new \YouTrack\YouTrackCommunicator($client, array(
-    'uri' => 'https://youtrack.myhost.com',
+   ' uri' => 'https://youtrack.myhost.com',
     'username' => 'myUser',
     'password' => 'myPassword'
 ));
 
+// find issue entities from a string, by parsing issue
+$issueIDs = $api->findIds("re #MYPRJ-1, fixes #MYPRJ-2, reopens #MYPRJ-3");
+if(count($issueIDs) > 0) {
+    $issues = $api->searchIssues($issueIDs);
+    print_r($issues);
+}
+
+// finding a signle issue does not use the #prefix findIds does!
 $myIssue = $api->getIssue('MYPRJ-1');
-
 $api->executeCommands($myIssue, ['State', 'Built'], 'I just closed this automagically.');
-
 $api->trackTimeOnIssue($myIssue, 120, 'Time booked via YouTrackCommunicator API');
 
 $loggedWork = $api->getWorkItemsForIssue($myIssue);
-
-var_dump($loggedWork);

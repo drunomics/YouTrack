@@ -31,7 +31,7 @@ if(count($issueIDs) > 0) {
     print_r($issues);
 }
 
-// finding a signle issue does not use the #prefix findIds does!
+// finding a single issue does not use the #prefix findIds does!
 $myIssue = $api->getIssue('MYPRJ-1');
 $api->executeCommands($myIssue, ['State', 'Built'], 'I just closed this automagically.');
 $api->trackTimeOnIssue($myIssue, 120, 'Time booked via YouTrackCommunicator API');

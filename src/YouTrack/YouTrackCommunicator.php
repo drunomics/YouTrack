@@ -599,7 +599,9 @@ class YouTrackCommunicator
                 $labour->setDate($item->date);
                 $labour->setDuration($item->duration);
                 $labour->setAuthorName($item->author->login);
-                $labour->setComment($item->description);
+                if(isset($item->description)) {
+                    $labour->setComment($item->description);
+                }
                 if(isset($item->worktype)) {
                     $labour->setType($item->worktype->name);
                 }

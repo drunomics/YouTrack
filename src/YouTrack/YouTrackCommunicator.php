@@ -6,7 +6,6 @@ use Buzz\Browser;
 use Buzz\Client\FileGetContents;
 use Buzz\Exception\InvalidArgumentException;
 use Buzz\Message\Response;
-use YouTrack\Entity\WorkItem;
 use YouTrack\Exception\APIException;
 
 /**
@@ -21,7 +20,6 @@ class YouTrackCommunicator
 {
     private $browser;
     private $options;
-    private $cookie = null;
     private $regexp = '\w+-\d+'; // youtrack issue id validation;
     private $issueCache = array(); // unique map of all issues.
     private $projectCache = array(); // unique map of all projects attached to issues.
@@ -71,12 +69,7 @@ class YouTrackCommunicator
      */
     protected function buildHeaders(array $headers = array())
     {
-        if (null === $this->cookie) {
-            $this->login();
-        }
-        foreach ($this->cookie as $cookie) {
-            $headers[] = 'Cookie: ' . $cookie;
-        }
+        $headers[] = 'Authorization: Basic ' . base64_encode($this->getOption('username') . ':' . $this->getOption('password'));
         $headers[] = 'Accept: application/json';
         return $headers;
     }
@@ -95,7 +88,6 @@ class YouTrackCommunicator
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
-        $this->cookie = $response->getHeader('Set-Cookie', false);
     }
 
     /**
@@ -268,8 +260,8 @@ class YouTrackCommunicator
             $issue->setProjectEntity($this->preFetchProject($issueData)); // set prefetched project onto entity.
             try {
                 $this->getWorkItemsForIssue($issue);
-            } catch(APIException $E) {
-                if(stripos($E->getMessage(), "is disabled") !== false) { // catch "time tracking is disabled messages, handle silently."
+            } catch (APIException $E) {
+                if (stripos($E->getMessage(), "is disabled") !== false) { // catch "time tracking is disabled messages, handle silently."
                     // do nothing.
                 } else {
                     throw $E;
@@ -545,7 +537,7 @@ class YouTrackCommunicator
      * @param string $type (optional, default: "Development"). Possible: One of the allowed types by YouTrack: 'No type', 'Development', 'Testing', 'Documentation'
      * @return boolean added
      */
-    public function trackTimeOnIssue(Entity\Issue $issue, $timeToBook = 0, $comment = 'Added via YouTrackCommunicator API.', $type='Development')
+    public function trackTimeOnIssue(Entity\Issue $issue, $timeToBook = 0, $comment = 'Added via YouTrackCommunicator API.', $type = 'Development')
     {
         $output = false;
 
@@ -560,10 +552,10 @@ class YouTrackCommunicator
 
             $response = $this->browser->post(
                 $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
-                $this->buildHeaders(array('Content-Type: application/xml; charset=UTF-8','Content-Length: '.strlen($xml))),
+                $this->buildHeaders(array('Content-Type: application/xml; charset=UTF-8', 'Content-Length: ' . strlen($xml))),
                 $xml);
 
-            if($response->getStatusCode() != 201) {
+            if ($response->getStatusCode() != 201) {
                 throw new Exception\APIException(__METHOD__ . ' WorkItem record not created. ', $response);
             } else {
                 $output = true;
@@ -579,7 +571,8 @@ class YouTrackCommunicator
      * @param Entity\Issue $issue
      * @return Array(Entity\WorkItem)
      */
-    public function getWorkItemsForIssue(Entity\Issue $issue) {
+    public function getWorkItemsForIssue(Entity\Issue $issue)
+    {
 
         $response = $this->browser->get(
             $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
@@ -599,8 +592,12 @@ class YouTrackCommunicator
                 $labour->setDate($item->date);
                 $labour->setDuration($item->duration);
                 $labour->setAuthorName($item->author->login);
-                $labour->setComment($item->description);
-                $labour->setType($item->worktype->name);
+                if (isset($item->description)) {
+                    $labour->setComment($item->description);
+                }
+                if (isset($item->worktype)) {
+                    $labour->setType($item->worktype->name);
+                }
 
                 $output[] = $labour;
             }
@@ -608,7 +605,4 @@ class YouTrackCommunicator
             return $output;
         }
     }
-
-
-
 }

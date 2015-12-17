@@ -2,10 +2,7 @@
 
 namespace YouTrack;
 
-use Buzz\Browser;
-use Buzz\Client\FileGetContents;
-use Buzz\Exception\InvalidArgumentException;
-use Buzz\Message\Response;
+use Guzzle\Http\Client;
 use YouTrack\Exception\APIException;
 
 /**
@@ -18,48 +15,26 @@ use YouTrack\Exception\APIException;
  */
 class YouTrackCommunicator
 {
-    private $browser;
-    private $options;
+    private $username;
+    private $password;
+    private $uri;
     private $regexp = '\w+-\d+'; // youtrack issue id validation;
     private $issueCache = array(); // unique map of all issues.
     private $projectCache = array(); // unique map of all projects attached to issues.
     private $toLoad = array();
+    private $client;
 
     /**
-     * Mockable constructor.
-     * @param Browser $browser Buzz instance
-     * @param array $options
+     * YouTrackCommunicator constructor.
+     * @param $username
+     * @param $password
      */
-    public function __construct(Browser $browser, array $options)
+    public function __construct($uri, $username, $password)
     {
-        if ($browser->getClient() instanceof FileGetContents) {
-            throw new \InvalidArgumentException('The FileGetContents client is known not to work with this library. Please instantiate the Browser with an instance of \Buzz\Client\Curl');
-        }
-        $this->browser = $browser;
-        $this->options = $options;
-    }
-
-    /**
-     * Exception throwing options fetcher.
-     * @throws InvalidArgumentException
-     * @param $option
-     * @return mixed
-     */
-    protected function getOption($option)
-    {
-        if (!isset($this->options[$option])) {
-            throw new \InvalidArgumentException('The option ' . $option . ' does not exist');
-        }
-        return $this->options[$option];
-    }
-
-    /**
-     * Get handle to Buzz
-     * @return Browser
-     */
-    protected function getBrowser()
-    {
-        return $this->browser;
+        $this->uri = $uri;
+        $this->username = $username;
+        $this->password = $password;
+        $this->client = new Client();
     }
 
     /**
@@ -69,7 +44,7 @@ class YouTrackCommunicator
      */
     protected function buildHeaders(array $headers = array())
     {
-        $headers[] = 'Authorization: Basic ' . base64_encode($this->getOption('username') . ':' . $this->getOption('password'));
+        $headers[] = 'Authorization: Basic ' . base64_encode($this->username . ':' . $this->password);
         $headers[] = 'Accept: application/json';
         return $headers;
     }
@@ -81,11 +56,9 @@ class YouTrackCommunicator
      */
     public function login()
     {
-        $response = $this->browser->post($this->getOption('uri') . '/rest/user/login', array(
-            'Content-Type' => 'application/x-www-form-urlencoded'
-        ), array('login' => $this->getOption('username'), 'password' => $this->getOption('password')));
+        $response = $this->client->get($this->uri . '/rest/user/login', array('Content-Type' => 'application/x-www-form-urlencoded'), array('login' => $this->username, 'password' => $this->password));
 
-        if (!$response->isOk()) {
+        if (!$response->getSt) {
             throw new Exception\APIException(__METHOD__, $response);
         }
     }
@@ -189,7 +162,7 @@ class YouTrackCommunicator
                 throw new \InvalidArgumentException('Supply the issue ID without the #');
             }
 
-            $response = $this->browser->get($this->getOption('uri') . '/rest/issue/' . $id, $this->buildHeaders());
+            $response = $this->browser->get($this->uri . '/rest/issue/' . $id, $this->buildHeaders());
             if ($response->isNotFound()) {
                 $this->issueCache[$id] = null;
 
@@ -288,7 +261,7 @@ class YouTrackCommunicator
         $search = implode("%20", array_map(function ($id) {
             return "%23$id";
         }, $ids));
-        $response = $this->browser->get($this->getOption('uri') . '/rest/issue?filter=' . $search, $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/issue?filter=' . $search, $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -313,7 +286,7 @@ class YouTrackCommunicator
     public function searchIssues($filter, $with = array(), $max = 10, $after = '')
     {
         $args = array_filter(array('filter' => $filter, 'with' => $with, 'max' => $max, 'after' => $after));
-        $response = $this->browser->get($this->getOption('uri') . '/rest/issue?' . http_build_query($args), $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/issue?' . http_build_query($args), $this->buildHeaders());
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -373,7 +346,7 @@ class YouTrackCommunicator
             $post[] = 'runAs=' . $runAs;
         }
 
-        $response = $this->browser->post($this->getOption('uri') . '/rest/issue/' . $issue->getId() . '/execute', $this->buildHeaders(), implode("&", $post));
+        $response = $this->browser->post($this->uri . '/rest/issue/' . $issue->getId() . '/execute', $this->buildHeaders(), implode("&", $post));
 
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
@@ -390,7 +363,7 @@ class YouTrackCommunicator
      */
     public function findUserName($email)
     {
-        $response = $this->browser->get($this->getOption('uri') . '/rest/admin/user?q=' . $email, $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/admin/user?q=' . $email, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -428,7 +401,7 @@ class YouTrackCommunicator
         foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
-                $response = $this->browser->post($this->getOption('uri') . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
+                $response = $this->browser->post($this->uri . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
                     'releaseDate' => time() . '000',
                     'released' => "true"
                 )));
@@ -461,7 +434,7 @@ class YouTrackCommunicator
         foreach ($versionsData['version'] as $versionData) {
             $foundVersions[] = $versionData['value'];
             if ($versionData['value'] == $version) {
-                $response = $this->browser->post($this->options['uri'] . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
+                $response = $this->browser->post($this->uri . '/rest/admin/customfield/versionBundle/' . $bundleName . '/' . $version, $this->buildHeaders(), http_build_query(array(
                     'released' => "false"
                 )));
                 if (!$response->isOk()) {
@@ -483,7 +456,7 @@ class YouTrackCommunicator
      */
     private function getFixVersionBundleName($project)
     {
-        $response = $this->browser->get($this->options['uri'] . '/rest/admin/project/' . $project . '/customfield/Fix%20versions', $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/admin/project/' . $project . '/customfield/Fix%20versions', $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -501,7 +474,7 @@ class YouTrackCommunicator
      */
     private function getVersionData($bundleName)
     {
-        $response = $this->browser->get($this->options['uri'] . '/rest/admin/customfield/versionBundle/' . $bundleName, $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/admin/customfield/versionBundle/' . $bundleName, $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__ . ' (get version field data)', $response);
         }
@@ -518,7 +491,7 @@ class YouTrackCommunicator
      */
     private function getTimeTrackingSettings(Entity\Project $project)
     {
-        $response = $this->browser->get($this->options['uri'] . '/rest/admin/project/' . $project->getName() . '/timetracking', $this->buildHeaders());
+        $response = $this->browser->get($this->uri . '/rest/admin/project/' . $project->getName() . '/timetracking', $this->buildHeaders());
         if (!$response->isOk()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -551,7 +524,7 @@ class YouTrackCommunicator
                 </workItem>", time() * 1000, $timeToBook, $comment, $type);
 
             $response = $this->browser->post(
-                $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
+                $this->uri . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
                 $this->buildHeaders(array('Content-Type: application/xml; charset=UTF-8', 'Content-Length: ' . strlen($xml))),
                 $xml);
 
@@ -575,7 +548,7 @@ class YouTrackCommunicator
     {
 
         $response = $this->browser->get(
-            $this->options['uri'] . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
+            $this->uri . '/rest/issue/' . $issue->getId() . '/timetracking/workitem',
             $this->buildHeaders());
 
         if (!$response->isOk()) {

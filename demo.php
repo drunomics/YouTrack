@@ -11,15 +11,14 @@
  * - Fetches all WorkItem lines for the issue (logged time)
  */
 
+use Guzzle\Http\Client;
 
 require('vendor/autoload.php');
 require('src/YouTrack/YouTrackCommunicator.php');
 
-$client = new Buzz\Browser;
-$client->setClient(new Buzz\Client\Curl());
+$http = new Client('https://my.youtrack.endpoint');
 
-$api = new \YouTrack\YouTrackCommunicator($client, array(
-   ' uri' => 'https://youtrack.myhost.com',
+$api = new \YouTrack\YouTrackCommunicator($http, array(
     'username' => 'myUser',
     'password' => 'myPassword'
 ));

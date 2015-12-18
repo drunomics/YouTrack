@@ -8,15 +8,14 @@ Fetches issues as nice Issue entities.
 Usage:
 
 ```
+use Guzzle\Http\Client;
+
 require('src/YouTrack/YouTrackCommunicator.php');
 require('vendor/autoload.php');
 
-
-$client = new Buzz\Browser;
-$client->setClient(new Buzz\Client\Curl());
+$http = new Client('https://my.youtrack.endpoint');
 
 $api = new \YouTrack\YouTrackCommunicator($client, array(
-    'uri' => 'http://your.youtrack.base',
     'username' => 'your_api_user',
     'password' => 'your_api_password'
 ));
@@ -33,3 +32,13 @@ For more info on what commands you can use, check the YouTrack docs:
 - https://confluence.jetbrains.com/display/YTD4/Search+and+Command+Attributes
 - https://confluence.jetbrains.com/display/YTD3/Apply+Command+to+an+Issue
 - https://confluence.jetbrains.com/display/YTD3/Get+a+Version+Bundle
+
+Changelog:
+
+December 2015: Released v2.0.0
+- Minor changes to external interface and inner API working
+- Swapped out Buzz HTTP Client for Guzzle to bypass a CURL bug 
+- Made fetching TimeTracking info optional
+- Removed ReleaseVersion and UnreleaseVersion
+- Removed tests until we can write actually useful ones.
+

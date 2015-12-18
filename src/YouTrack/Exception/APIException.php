@@ -2,7 +2,7 @@
 
 namespace YouTrack\Exception;
 
-use Buzz\Message\Response;
+use Guzzle\Http\Message\Response;
 
 /**
  * @author Bart van den Burg <bart@samson-it.nl>
@@ -18,7 +18,7 @@ class APIException extends \RuntimeException
         $this->method = $method;
         $this->response = $response;
         
-        parent::__construct('The server responded with a '.$response->getStatusCode().' status code in method '.$method.': '.$response->getContent());
+        parent::__construct('The server responded with a '.$response->getStatusCode().' status code in method '.$method.': '.$response->getBody(true));
     }
     
     public function getMethod()

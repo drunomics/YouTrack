@@ -12,8 +12,7 @@ use YouTrack\Exception\APIException;
 /**
  * REST wrapper api for youtrack.
  * Docs:
- * https://confluence.jetbrains.com/display/YTD4/YouTrack+REST+API+Reference.
- *
+ * https://confluence.jetbrains.com/display/YTD4/YouTrack+REST+API+Reference
  * @author Bart van den Burg <bart@samson-it.nl>
  *
  * Updated December 2015 : JUR
@@ -34,7 +33,7 @@ class YouTrackCommunicator
      * Construct communicator and inject Guzzle instance.
      *
      * @param Guzzle Mockable guzzle instance
-     * @param array $options
+     * @param array   $options
      */
     public function __construct(Client $guzzle, $options = array())
     {
@@ -47,9 +46,7 @@ class YouTrackCommunicator
      * Exception throwing options fetcher.
      *
      * @throws InvalidArgumentException
-     *
      * @param $option parameter to fetch
-     *
      * @return mixed
      */
     protected function getOption($option)
@@ -57,18 +54,15 @@ class YouTrackCommunicator
         if (!isset($this->options[$option])) {
             throw new \InvalidArgumentException('The option '.$option.' does not exist');
         }
-
         return $this->options[$option];
     }
 
     /**
      * Execute GET request on the base endpoint and return JSON.
-     *
      * @throws APIException
-     *
      * @return \Guzzle\Http\Client $client
      */
-    protected function GETRequest($path, $data = array())
+    protected function GETRequest($path, $data=array())
     {
         $startTime = microtime(true);
         $response = $this->guzzle->get($path, array(), $data)->send();
@@ -76,33 +70,27 @@ class YouTrackCommunicator
             throw new Exception\APIException(__METHOD__, $response);
         }
         $duration = microtime(true) - $startTime;
-        $this->executed[] = array('method' => 'GET', 'duration' => $duration, 'path' => $path, 'data' => $data);
-
+        $this->executed[] = Array('method'=> 'GET', 'duration'=> $duration, 'path'=> $path, 'data'=> $data);
         return $response->json();
     }
 
     /**
      * Execute POST request on the base endpoint and return JSON.
-     *
      * @throws APIException
-     *
      * @param $path
-     * @param array $data    POST data
+     * @param array $data POST data
      * @param array $headers optional extra headers.
-     *
      * @return array parsed json
      */
-    protected function POSTRequest($path, $data = array(), $headers = array())
-    {
+    protected function POSTRequest($path, $data = array(), $headers = array()) {
         $startTime = microtime(true);
         $response = $this->guzzle->post($path, $headers, $data)->send();
         $duration = microtime(true) - $startTime;
-        $this->executed[] = array('method' => 'GET', 'duration' => $duration, 'path' => $path, 'data' => $data);
+        $this->executed[] = Array('method'=> 'GET', 'duration'=> $duration, 'path'=> $path, 'data'=> $data);
 
         if ($response->isError()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
-
         return $response->json();
     }
 
@@ -126,8 +114,8 @@ class YouTrackCommunicator
         } else {
             $this->cookie = $response->getHeader('Set-Cookie')->__toString();
             $this->guzzle->setDefaultOption('headers', array(
-                'Cookie' => $this->cookie,
-                'Accept' => 'application/json', )
+                    'Cookie' => $this->cookie,
+                    'Accept' => 'application/json')
             );
         }
     }
@@ -156,7 +144,6 @@ class YouTrackCommunicator
     public function findIds($string)
     {
         preg_match_all('/#('.$this->regexp.')/', $string, $m);
-
         return $m[1];
     }
 
@@ -240,7 +227,7 @@ class YouTrackCommunicator
             }
 
             try {
-                $issueData = $this->guzzle->get('/rest/issue/'.$id)->send()->getBody(true);
+                $issueData = $this->guzzle->get('/rest/issue/'.$id)->send()->json();
                 $project = $this->preFetchProject($issueData); // prefetch project data and config for issue when not cached.
 
                 $this->getTodo(); // fetch issues that are on the 'to fetch' list so that children/parents are set properly for this issue
@@ -248,10 +235,10 @@ class YouTrackCommunicator
                 $issue = $this->parseIssueData($id, $issueData); // parse issue arraydata into an entity.
                 $issue->setProjectEntity($project); // set prefetched project onto entity.
                 $this->issueCache[$id] = $issue; //inject issue into issuecache.
+
             } catch (APIException $E) {
                 if ($E->getResponse()->getStatusCode() == 404) {
                     $this->issueCache[$id] = null;
-
                     return;
                 }
             }
@@ -275,6 +262,7 @@ class YouTrackCommunicator
     private function preFetchProject($issueData)
     {
         $projectName = null;
+
         foreach ($issueData['field'] as $idx => $info) {
             if ($info['name'] == 'projectShortName') {
                 $projectName = $info['value'];
@@ -302,13 +290,13 @@ class YouTrackCommunicator
      *
      * @return array[Issue]
      */
-    private function getIssuesFromResponse(array $response, $withTimeTracking = false)
+    private function getIssuesFromResponse(array $response, $withTimeTracking=false)
     {
         $issues = array();
         foreach ($response['issue'] as $issueData) {
             $issue = $this->parseIssueData($issueData['id'], $issueData);
             $issue->setProjectEntity($this->preFetchProject($issueData)); // set prefetched project onto entity.
-            if ($withTimeTracking) {
+            if($withTimeTracking) {
                 try {
                     $this->getWorkItemsForIssue($issue);
                 } catch (APIException $E) {
@@ -333,7 +321,7 @@ class YouTrackCommunicator
      *
      * @return array[Issue]
      */
-    public function getIssues(array $ids, $withTimeTracking = true)
+    public function getIssues(array $ids, $withTimeTracking=true)
     {
         if (!count($ids)) {
             return array();
@@ -367,7 +355,6 @@ class YouTrackCommunicator
         $issues = $this->getIssuesFromResponse($response, true);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
-
         return $issues;
     }
 
@@ -399,7 +386,7 @@ class YouTrackCommunicator
      * @see https://confluence.jetbrains.com/display/YTD3/Apply+Command+to+an+Issue
      *
      * @param Issue $issue    to execute commands on
-     * @param array $commands array of string commands (will be joined)
+     * @param array        $commands array of string commands (will be joined)
      * @param $comment A comment to add to an issue.
      * @param string $group  User group name. Use to specify visibility settings of a comment to be post.
      * @param bool   $silent If set 'true' then no notifications about changes made with the specified command will be send. By default, is 'false'.
@@ -441,7 +428,6 @@ class YouTrackCommunicator
                 return $userData['login'];
             }
         }
-
         return;
     }
 
@@ -457,7 +443,6 @@ class YouTrackCommunicator
     private function getFixVersionBundleName($project)
     {
         $fieldData = $this->GETRequest('/rest/admin/project/'.$project.'/customfield/Fix%20versions');
-
         return $fieldData['param'][0]['value'];
     }
 
@@ -468,7 +453,6 @@ class YouTrackCommunicator
      * @see https://confluence.jetbrains.com/display/YTD3/Get+a+Version+Bundle
      *
      * @param $bundleName
-     *
      * @return mixed
      */
     private function getVersionData($bundleName)
@@ -497,10 +481,10 @@ class YouTrackCommunicator
      *
      * @see https://confluence.jetbrains.com/display/YTD6/Create%20New%20Work%20Item
      *
-     * @param Issue  $issue
-     * @param int    $timeToBook in minutes
-     * @param string $comment    (optional, default: "Added via YouTrackCommunicator API"))
-     * @param string $type       (optional, default: "Development"). Possible: One of the allowed types by YouTrack: 'No type', 'Development', 'Testing', 'Documentation'
+     * @param Issue $issue
+     * @param int          $timeToBook in minutes
+     * @param string       $comment    (optional, default: "Added via YouTrackCommunicator API"))
+     * @param string       $type       (optional, default: "Development"). Possible: One of the allowed types by YouTrack: 'No type', 'Development', 'Testing', 'Documentation'
      *
      * @return bool added
      */
@@ -516,11 +500,10 @@ class YouTrackCommunicator
                 <worktype><name>%s</name></worktype>
                 </workItem>', time() * 1000, $timeToBook, $comment, $type);
 
-            $response = $this->guzzle->post('/rest/issue/'.$issue->getId().'/timetracking/workitem', $xml,
-                array(
-                    'Content-Type' => 'application/xml; charset=UTF-8',
-                    'Content-Length' => strlen($xml),
-                ))->send();
+            $response = $this->guzzle->post('/rest/issue/'.$issue->getId().'/timetracking/workitem', array(
+                'Content-Type' => 'application/xml; charset=UTF-8',
+                'Content-Length' => strlen($xml),
+            ),  $xml)->send();
 
             if ($response->getStatusCode() != 201) {
                 throw new Exception\APIException(__METHOD__.' WorkItem record not created. ', $response);
@@ -561,7 +544,6 @@ class YouTrackCommunicator
             }
             $output[] = $labour;
         }
-
         return $output;
     }
 }

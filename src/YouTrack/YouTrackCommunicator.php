@@ -485,12 +485,13 @@ class YouTrackCommunicator
      * @param int          $timeToBook in minutes
      * @param string       $comment    (optional, default: "Added via YouTrackCommunicator API"))
      * @param string       $type       (optional, default: "Development"). Possible: One of the allowed types by YouTrack: 'No type', 'Development', 'Testing', 'Documentation'
-     *
+     * @param DateTime     $atDate     (optional) default date/time of booking, or current date when not passed.
      * @return bool added
      */
-    public function trackTimeOnIssue(Issue $issue, $timeToBook = 0, $comment = 'Added via YouTrackCommunicator API.', $type = 'Development')
+    public function trackTimeOnIssue(Issue $issue, $timeToBook = 0, $comment = 'Added via YouTrackCommunicator API.', $type = 'Development', $atDate=null)
     {
         $output = false;
+        $atDate = $atDate !== null ? new \DateTime() : new DateTime($atDate);
 
         if ($issue->getProjectEntity()->getSetting('enabled') == 1) {
             $xml = sprintf('<workItem>
@@ -498,7 +499,7 @@ class YouTrackCommunicator
                 <duration>%d</duration>
                 <description>%s</description>
                 <worktype><name>%s</name></worktype>
-                </workItem>', time() * 1000, $timeToBook, $comment, $type);
+                </workItem>', $atDate->getTimestamp() * 1000, $timeToBook, $comment, $type);
 
             $response = $this->guzzle->post('/rest/issue/'.$issue->getId().'/timetracking/workitem', array(
                 'Content-Type' => 'application/xml; charset=UTF-8',

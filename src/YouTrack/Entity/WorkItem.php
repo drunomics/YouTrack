@@ -131,6 +131,8 @@ class WorkItem
     }
 
     /**
+     * Returns the duration in minutes.
+     *
      * @return int
      */
     public function getDuration()
@@ -149,11 +151,23 @@ class WorkItem
     }
 
     /**
-     * @return mixed
+     * Returns the date as a timestamp in microseconds.
+     *
+     * @return int
      */
     public function getDate()
     {
         return $this->date;
+    }
+
+    /**
+     * Returns the date as DateTime object.
+     *
+     * @return \DateTime
+     */
+    public function getDateObject()
+    {
+        return \DateTime::createFromFormat('U', $this->date / 1000);
     }
 
     /**

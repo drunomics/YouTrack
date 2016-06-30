@@ -346,7 +346,7 @@ class YouTrackCommunicator
      * @param int    $max
      * @param string $after
      *
-     * @return array[Issue]
+     * @return Issue[]
      */
     public function searchIssues($filter, $with = array(), $max = 10, $after = '')
     {
@@ -522,7 +522,7 @@ class YouTrackCommunicator
      *
      * @param Issue $issue
      *
-     * @return Array(WorkItem)
+     * @return WorkItem[]
      */
     public function getWorkItemsForIssue(Issue $issue)
     {

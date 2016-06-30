@@ -102,7 +102,7 @@ class YouTrackCommunicator
      */
     public function login()
     {
-        $response = $this->guzzle->post('/rest/user/login', array(
+        $response = $this->guzzle->post('rest/user/login', array(
             'Content-Type' => 'application/x-www-form-urlencoded',
         ), array(
             'login' => $this->getOption('username'),
@@ -227,7 +227,7 @@ class YouTrackCommunicator
             }
 
             try {
-                $issueData = $this->guzzle->get('/rest/issue/'.$id)->send()->json();
+                $issueData = $this->guzzle->get('rest/issue/'.$id)->send()->json();
                 $project = $this->preFetchProject($issueData); // prefetch project data and config for issue when not cached.
 
                 $this->getTodo(); // fetch issues that are on the 'to fetch' list so that children/parents are set properly for this issue
@@ -329,7 +329,7 @@ class YouTrackCommunicator
         $search = implode('%20', array_map(function ($id) {
             return "%23$id";
         }, $ids));
-        $response = $this->GETrequest('/rest/issue?filter='.$search);
+        $response = $this->GETrequest('rest/issue?filter='.$search);
         $issues = $this->getIssuesFromResponse($response, $withTimeTracking);
 
         // get any todo pushed to the list, so that children/parents are set properly for this issue
@@ -351,7 +351,7 @@ class YouTrackCommunicator
     public function searchIssues($filter, $with = array(), $max = 10, $after = '')
     {
         $args = array_filter(array('filter' => $filter, 'with' => $with, 'max' => $max, 'after' => $after));
-        $response = $this->GETRequest('/rest/issue?'.http_build_query($args));
+        $response = $this->GETRequest('rest/issue?'.http_build_query($args));
         $issues = $this->getIssuesFromResponse($response, true);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
@@ -407,7 +407,7 @@ class YouTrackCommunicator
             $post[] = 'runAs='.$runAs;
         }
 
-        return $this->POSTRequest('/rest/issue/'.$issue->getId().'/execute', implode('&', $post));
+        return $this->POSTRequest('rest/issue/'.$issue->getId().'/execute', implode('&', $post));
     }
 
     /**
@@ -421,7 +421,7 @@ class YouTrackCommunicator
      */
     public function findUserName($email)
     {
-        $data = $this->GETRequest('/rest/admin/user?q='.$email);
+        $data = $this->GETRequest('rest/admin/user?q='.$email);
         foreach ($data as $userData) {
             $userData = $this->GETRequest($userData['url']);
             if ($userData['email'] == $email) {
@@ -442,7 +442,7 @@ class YouTrackCommunicator
      */
     private function getFixVersionBundleName($project)
     {
-        $fieldData = $this->GETRequest('/rest/admin/project/'.$project.'/customfield/Fix%20versions');
+        $fieldData = $this->GETRequest('rest/admin/project/'.$project.'/customfield/Fix%20versions');
         return $fieldData['param'][0]['value'];
     }
 
@@ -457,7 +457,7 @@ class YouTrackCommunicator
      */
     private function getVersionData($bundleName)
     {
-        return $this->GETRequest('/rest/admin/customfield/versionBundle/'.$bundleName);
+        return $this->GETRequest('rest/admin/customfield/versionBundle/'.$bundleName);
     }
 
     /**
@@ -471,7 +471,7 @@ class YouTrackCommunicator
      */
     private function getTimeTrackingSettings(Project $project)
     {
-        return $this->GETRequest('/rest/admin/project/'.$project->getName().'/timetracking');
+        return $this->GETRequest('rest/admin/project/'.$project->getName().'/timetracking');
     }
 
     /**
@@ -501,7 +501,7 @@ class YouTrackCommunicator
                 <worktype><name>%s</name></worktype>
                 </workItem>', $atDate->getTimestamp() * 1000, $timeToBook, $comment, $type);
 
-            $response = $this->guzzle->post('/rest/issue/'.$issue->getId().'/timetracking/workitem', array(
+            $response = $this->guzzle->post('rest/issue/'.$issue->getId().'/timetracking/workitem', array(
                 'Content-Type' => 'application/xml; charset=UTF-8',
                 'Content-Length' => strlen($xml),
             ),  $xml)->send();
@@ -526,7 +526,7 @@ class YouTrackCommunicator
      */
     public function getWorkItemsForIssue(Issue $issue)
     {
-        $items = $this->GETRequest('/rest/issue/'.$issue->getId().'/timetracking/workitem');
+        $items = $this->GETRequest('rest/issue/'.$issue->getId().'/timetracking/workitem');
         $output = array();
 
         foreach ($items as $item) {

@@ -178,6 +178,12 @@ class YouTrackCommunicator
                 case 'State':
                     $issue->setStatus($fieldData['value'][0]);
                     break;
+                case 'description':
+                    $issue->setDescription($fieldData['value']);
+                    break;
+                case 'Redmine, Jira Ticket':
+                    $issue->setRelatedTicket($fieldData['value'][0]);
+                    break;
                 case 'links':
                     foreach ($fieldData['value'] as $link) {
                         if ($link['role'] == 'subtask of') {

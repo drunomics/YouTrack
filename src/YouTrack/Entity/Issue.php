@@ -19,6 +19,7 @@ class Issue {
     private $estimate;
     private $children = array();
     private $timetrackEntries = array();
+    private $relatedTicket;
 
     public function getId()
     {
@@ -153,5 +154,17 @@ class Issue {
         $this->timetrackEntries = $timetrackEntries;
     }
 
+    /**
+     * @return string|NULL
+     */
+    public function getRelatedTicket() {
+        return $this->relatedTicket;
+    }
 
+    /**
+     * @param string $relatedTicket
+     */
+    public function setRelatedTicket($relatedTicket) {
+        $this->relatedTicket = $relatedTicket;
+    }
 }

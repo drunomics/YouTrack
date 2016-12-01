@@ -30,6 +30,18 @@ class YouTrackCommunicator
     private $executed = array();
 
     /**
+     * The custom field key for the related ticket field.
+     *
+     * If set will set the relatedTicket property on the issue.
+     *
+     * @see Issue::setRelatedTicket()
+     * @see parseIssueData()
+     *
+     * @var null
+     */
+    protected $relatedTicketKey = NULL;
+
+    /**
      * Construct communicator and inject Guzzle instance.
      *
      * @param Guzzle Mockable guzzle instance
@@ -168,6 +180,10 @@ class YouTrackCommunicator
         }
 
         foreach ($data['field'] as $fieldData) {
+            if ($this->relatedTicketKey && isset($fieldData['name'][$this->relatedTicketKey])) {
+                $issue->setRelatedTicket($fieldData['value'][0]);
+            }
+
             switch ($fieldData['name']) {
                 case 'summary':
                     $issue->setSummary($fieldData['value']);
@@ -180,9 +196,6 @@ class YouTrackCommunicator
                     break;
                 case 'description':
                     $issue->setDescription($fieldData['value']);
-                    break;
-                case 'Redmine, Jira Ticket':
-                    $issue->setRelatedTicket($fieldData['value'][0]);
                     break;
                 case 'links':
                     foreach ($fieldData['value'] as $link) {

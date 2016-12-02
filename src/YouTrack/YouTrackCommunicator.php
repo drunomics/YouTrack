@@ -107,6 +107,26 @@ class YouTrackCommunicator
     }
 
     /**
+     * Execute PUT request on the base endpoint and return JSON.
+     * @throws APIException
+     * @param $path
+     * @param array $data POST data
+     * @param array $headers optional extra headers.
+     * @return array parsed json
+     */
+    protected function PUTRequest($path, $data = array(), $headers = array()) {
+        $startTime = microtime(true);
+        $response = $this->guzzle->put($path, $headers, $data)->send();
+        $duration = microtime(true) - $startTime;
+        $this->executed[] = Array('method'=> 'PUT', 'duration'=> $duration, 'path'=> $path, 'data'=> $data);
+
+        if ($response->isError()) {
+            throw new Exception\APIException(__METHOD__, $response);
+        }
+        return $response->json();
+    }
+
+    /**
      * Login with the passed credentials.
      * Stores cookie when login success,.
      *

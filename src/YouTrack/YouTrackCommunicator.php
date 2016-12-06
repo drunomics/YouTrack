@@ -200,7 +200,7 @@ class YouTrackCommunicator
         }
 
         foreach ($data['field'] as $fieldData) {
-            if ($this->relatedTicketKey && isset($fieldData['name'][$this->relatedTicketKey])) {
+            if ($this->relatedTicketKey && $fieldData['name'] == $this->relatedTicketKey) {
                 $issue->setRelatedTicket($fieldData['value'][0]);
             }
 

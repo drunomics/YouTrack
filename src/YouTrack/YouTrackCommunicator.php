@@ -435,18 +435,21 @@ class YouTrackCommunicator
      */
     public function executeCommands(Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
     {
-        $post = array();
-        $post[] = 'command='.urlencode(implode(' ', $commands));
-        $post[] = 'comment='.urlencode($comment);
-        $post[] = 'disableNotifications='.($silent ? 'true' : 'false');
-        if (null !== $group) {
-            $post[] = 'group='.urlencode($group);
-        }
-        if (null !== $runAs) {
-            $post[] = 'runAs='.$runAs;
-        }
+      $post = array(
+        'command' => implode(' ', $commands),
+        'comment' => $comment,
+        'disableNotifications' => ($silent ? 'true' : 'false'),
+      );
 
-        return $this->POSTRequest('rest/issue/'.$issue->getId().'/execute', implode('&', $post));
+      if (null !== $group) {
+        $post['group'] = $group;
+      }
+
+      if (null !== $runAs) {
+        $post['runAs'] = $runAs;
+      }
+
+      return $this->POSTRequest('rest/issue/'.$issue->getId().'/execute', $post);
     }
 
     /**

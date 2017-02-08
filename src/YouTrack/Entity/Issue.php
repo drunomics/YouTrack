@@ -20,6 +20,7 @@ class Issue {
     private $children = array();
     private $timetrackEntries = array();
     private $relatedTicket;
+    private $tags = array();
 
     public function getId()
     {
@@ -90,6 +91,24 @@ class Issue {
     public function setDescription($description)
     {
         $this->description = $description;
+    }
+
+    public function getTags() {
+      return $this->tags;
+    }
+
+    public function setTags($tags) {
+      $this->tags = $tags;
+    }
+
+    public function hasTag($key) {
+      foreach ($this->tags as $tag) {
+        if ($tag['value'] == $key) {
+          return TRUE;
+        }
+      }
+
+      return FALSE;
     }
 
     public function getParent()

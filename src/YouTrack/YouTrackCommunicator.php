@@ -195,6 +195,10 @@ class YouTrackCommunicator
         $issue = new Issue();
         $issue->setId($id);
 
+        if (is_array($data['tag']) && !empty($data['tag'])) {
+          $issue->setTags($data['tag']);
+        }
+
         if (array_key_exists('projectShortName', $data['field'])) {
             $issue->setProject($data['field']['value']);
         }

@@ -221,6 +221,12 @@ class YouTrackCommunicator
                 case 'description':
                     $issue->setDescription($fieldData['value']);
                     break;
+                case 'Client Sprint':
+                    $issue->setClientSprint($fieldData['value']);
+                    break;
+                case 'Sprint':
+                    $issue->setSprint($fieldData['value']);
+                    break;
                 case 'links':
                     foreach ($fieldData['value'] as $link) {
                         if ($link['role'] == 'subtask of') {

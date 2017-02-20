@@ -21,6 +21,8 @@ class Issue {
     private $timetrackEntries = array();
     private $relatedTicket;
     private $tags = array();
+    private $sprint = array();
+    private $clientSprint = array();
 
     public function getId()
     {
@@ -186,4 +188,32 @@ class Issue {
     public function setRelatedTicket($relatedTicket) {
         $this->relatedTicket = $relatedTicket;
     }
+
+  /**
+   * @return array
+   */
+  public function getSprint() {
+    return $this->sprint;
+  }
+
+  /**
+   * @param array $sprint
+   */
+  public function setSprint($sprint) {
+    $this->sprint = $sprint;
+  }
+
+  /**
+   * @return array
+   */
+  public function getClientSprint() {
+    return $this->clientSprint;
+  }
+
+  /**
+   * @param array $clientSprint
+   */
+  public function setClientSprint($clientSprint) {
+    $this->clientSprint = $clientSprint;
+  }
 }

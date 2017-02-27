@@ -23,6 +23,8 @@ class Issue {
     private $tags = array();
     private $sprint = array();
     private $clientSprint = array();
+    private $assignee = array();
+    private $storyPoints;
 
     public function getId()
     {
@@ -216,4 +218,34 @@ class Issue {
   public function setClientSprint($clientSprint) {
     $this->clientSprint = $clientSprint;
   }
+
+  /**
+   * @return array
+   */
+  public function getAssignee() {
+    return $this->assignee;
+  }
+
+  /**
+   * @param array $assignee
+   */
+  public function setAssignee($assignee) {
+    $this->assignee = $assignee;
+  }
+
+  /**
+   * @return mixed
+   */
+  public function getStoryPoints() {
+    return $this->storyPoints;
+  }
+
+  /**
+   * @param mixed $storyPoints
+   */
+  public function setStoryPoints($storyPoints) {
+    $this->storyPoints = $storyPoints;
+  }
+
+
 }

@@ -25,6 +25,7 @@ class Issue {
     private $clientSprint = array();
     private $assignee = array();
     private $storyPoints;
+    private $priority;
 
     public function getId()
     {
@@ -247,5 +248,18 @@ class Issue {
     $this->storyPoints = $storyPoints;
   }
 
+  /**
+   * @return mixed
+   */
+  public function getPriority() {
+    return $this->priority;
+  }
+
+  /**
+   * @param mixed $priority
+   */
+  public function setPriority($priority) {
+    $this->priority = $priority;
+  }
 
 }

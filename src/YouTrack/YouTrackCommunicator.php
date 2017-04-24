@@ -212,6 +212,9 @@ class YouTrackCommunicator
                 case 'summary':
                     $issue->setSummary($fieldData['value']);
                     break;
+                case 'Priority':
+                    $issue->setPriority($fieldData['value'][0]);
+                    break;
                 case 'projectId': // does this even still work?
                     $issue->getProjectEntity()->setId($fieldData['value']);
                     break;

@@ -24,6 +24,7 @@ class Issue {
     private $sprint = array();
     private $clientSprint = array();
     private $assignee = array();
+    private $developer = array();
     private $storyPoints;
     private $priority;
 
@@ -232,6 +233,20 @@ class Issue {
    */
   public function setAssignee($assignee) {
     $this->assignee = $assignee;
+  }
+
+  /**
+   * @return array
+   */
+  public function getDeveloper() {
+    return $this->developer;
+  }
+
+  /**
+   * @param array $developer
+   */
+  public function setDeveloper($developer) {
+    $this->developer = $developer;
   }
 
   /**

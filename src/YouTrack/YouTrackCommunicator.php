@@ -233,6 +233,9 @@ class YouTrackCommunicator
                 case 'Assignee':
                     $issue->setAssignee($fieldData['value'][0]);
                     break;
+                case 'Developer':
+                    $issue->setDeveloper($fieldData['value'][0]);
+                    break;
                 case 'Story points':
                     $issue->setStoryPoints($fieldData['value'][0]);
                     break;

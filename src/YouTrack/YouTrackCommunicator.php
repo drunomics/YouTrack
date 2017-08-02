@@ -72,7 +72,7 @@ class YouTrackCommunicator
     /**
      * Execute GET request on the base endpoint and return JSON.
      * @throws APIException
-     * @return \Guzzle\Http\Client $client
+     * @return array parsed json
      */
     protected function GETRequest($path, $data=array())
     {
@@ -83,7 +83,7 @@ class YouTrackCommunicator
         }
         $duration = microtime(true) - $startTime;
         $this->executed[] = Array('method'=> 'GET', 'duration'=> $duration, 'path'=> $path, 'data'=> $data);
-        return $response->json();
+        return $this->getResponseData($response);
     }
 
     /**
@@ -103,7 +103,7 @@ class YouTrackCommunicator
         if ($response->isError()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
-        return $response->json();
+        return $this->getResponseData($response);
     }
 
     /**
@@ -123,7 +123,7 @@ class YouTrackCommunicator
         if ($response->isError()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
-        return $response->json();
+        return $this->getResponseData($response);
     }
 
     /**
@@ -610,5 +610,20 @@ class YouTrackCommunicator
             $output[] = $labour;
         }
         return $output;
+    }
+
+    /**
+     * Gets the response data as an array.
+     *
+     * @param Response $response
+     *
+     * @return array parsed json
+     */
+    protected function getResponseData(Response $response) {
+        if (strpos($response->getContentType(), "application/json") !== FALSE) {
+            return $response->json();
+        }
+
+        return array_filter((array) $response->getBody(TRUE));
     }
 }

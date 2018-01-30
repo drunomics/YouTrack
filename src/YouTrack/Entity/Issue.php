@@ -28,6 +28,13 @@ class Issue {
     private $storyPoints;
     private $priority;
 
+    /**
+     * Raw field data.
+     *
+     * @var array
+     */
+    protected $fieldData = array();
+
     public function getId()
     {
         return $this->id;
@@ -36,6 +43,27 @@ class Issue {
     public function setId($id)
     {
         $this->id = $id;
+    }
+
+    /**
+     * Sets raw field data.
+     *
+     * @param string $field
+     * @param array|mixed $value
+     */
+    public function setFieldData($field, $value) {
+      $this->fieldData[$field] = $value;
+    }
+
+    /**
+     * Gets raw field data.
+     *
+     * @param string $field
+     *
+     * @return mixed|null
+     */
+    public function getFieldData($field) {
+      return isset($this->fieldData[$field]) ? $this->fieldData[$field] : NULL;
     }
 
     /**

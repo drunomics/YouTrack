@@ -74,10 +74,10 @@ class YouTrackCommunicator
      * @throws APIException
      * @return array parsed json
      */
-    protected function GETRequest($path, $data=array())
+    protected function GETRequest($path, $data=array(), $encoding = 'application/json')
     {
         $startTime = microtime(true);
-        $response = $this->guzzle->get($path, array(), $data)->send();
+        $response = $this->guzzle->get($path, array(), $data)->setHeader('Accept', $encoding)->send();
         if ($response->isError()) {
             throw new Exception\APIException(__METHOD__, $response);
         }
@@ -623,6 +623,9 @@ class YouTrackCommunicator
     protected function getResponseData(Response $response) {
         if (strpos($response->getContentType(), "application/json") !== FALSE) {
             return $response->json();
+        }
+        elseif (strpos($response->getContentType(), "application/xml") !== FALSE) {
+          return $response->xml();
         }
 
         return array_filter((array) $response->getBody(TRUE));

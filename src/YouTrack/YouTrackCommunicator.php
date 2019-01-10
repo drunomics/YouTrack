@@ -625,9 +625,24 @@ class YouTrackCommunicator
             return $response->json();
         }
         elseif (strpos($response->getContentType(), "application/xml") !== FALSE) {
-          return $response->xml();
+            return $this->xmlResponseToArray($response->xml());
         }
 
         return array_filter((array) $response->getBody(TRUE));
+    }
+
+    /**
+     * Converts xml to array.
+     *
+     * @param \SimpleXMLElement|array $xml
+     *
+     * @return array
+     */
+    protected function xmlResponseToArray($xml) {
+        $output = array();
+        foreach ((array)$xml as $index => $node) {
+            $output[$index] = (is_object($node) || is_array($node)) ? $this->xmlResponseToArray($node) : $node;
+        }
+        return $output;
     }
 }

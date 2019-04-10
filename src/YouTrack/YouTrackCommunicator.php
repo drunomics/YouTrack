@@ -456,7 +456,7 @@ class YouTrackCommunicator
      *
      * @return mixed API Response
      */
-    public function executeCommands(Issue $issue, array $commands, $comment, $group = '', $silent = false, $runAs = null)
+    public function executeCommands(Issue $issue, array $commands, $comment, $group = null, $silent = false, $runAs = null)
     {
       $post = array(
         'command' => implode(' ', $commands),

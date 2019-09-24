@@ -407,14 +407,15 @@ class YouTrackCommunicator
      * @param array  $with
      * @param int    $max
      * @param string $after
+     * @param bool   $withTimeTracking
      *
      * @return array[Issue]
      */
-    public function searchIssues($filter, $with = array(), $max = 10, $after = '')
+    public function searchIssues($filter, $with = array(), $max = 10, $after = '', $withTimeTracking = false)
     {
         $args = array_filter(array('filter' => $filter, 'with' => $with, 'max' => $max, 'after' => $after));
         $response = $this->GETRequest('rest/issue?'.http_build_query($args));
-        $issues = $this->getIssuesFromResponse($response, true);
+        $issues = $this->getIssuesFromResponse($response, $withTimeTracking);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
         $this->getTodo();
         return $issues;

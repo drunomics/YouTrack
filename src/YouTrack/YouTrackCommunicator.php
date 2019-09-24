@@ -281,7 +281,7 @@ class YouTrackCommunicator
      *
      * @return Issue
      */
-    public function getIssue($id)
+    public function getIssue($id, $withTodos = false)
     {
         if (!isset($this->issueCache[$id])) {
             if ($id[0] == '#') {
@@ -292,7 +292,9 @@ class YouTrackCommunicator
                 $issueData = $this->guzzle->get('rest/issue/'.$id)->send()->json();
                 $project = $this->preFetchProject($issueData); // prefetch project data and config for issue when not cached.
 
-                $this->getTodo(); // fetch issues that are on the 'to fetch' list so that children/parents are set properly for this issue
+                if ($withTodos) {
+                  $this->getTodo(); // fetch issues that are on the 'to fetch' list so that children/parents are set properly for this issue
+                }
 
                 $issue = $this->parseIssueData($id, $issueData); // parse issue arraydata into an entity.
                 $issue->setProjectEntity($project); // set prefetched project onto entity.
@@ -383,7 +385,7 @@ class YouTrackCommunicator
      *
      * @return array[Issue]
      */
-    public function getIssues(array $ids, $withTimeTracking=true)
+    public function getIssues(array $ids, $withTimeTracking = false, $withTodos = false)
     {
         if (!count($ids)) {
             return array();
@@ -395,7 +397,9 @@ class YouTrackCommunicator
         $issues = $this->getIssuesFromResponse($response, $withTimeTracking);
 
         // get any todo pushed to the list, so that children/parents are set properly for this issue
-        $this->getTodo();
+        if ($withTodos) {
+          $this->getTodo();
+        }
 
         return $issues;
     }
@@ -411,13 +415,15 @@ class YouTrackCommunicator
      *
      * @return array[Issue]
      */
-    public function searchIssues($filter, $with = array(), $max = 10, $after = '', $withTimeTracking = false)
+    public function searchIssues($filter, $with = array(), $max = 10, $after = '', $withTimeTracking = false, $withTodos = false)
     {
         $args = array_filter(array('filter' => $filter, 'with' => $with, 'max' => $max, 'after' => $after));
         $response = $this->GETRequest('rest/issue?'.http_build_query($args));
         $issues = $this->getIssuesFromResponse($response, $withTimeTracking);
         // get any todo pushed to the list, so that children/parents are set properly for this issue
-        $this->getTodo();
+        if ($withTodos) {
+          $this->getTodo();
+        }
         return $issues;
     }
 
